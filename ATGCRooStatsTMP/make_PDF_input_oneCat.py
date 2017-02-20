@@ -19,11 +19,8 @@ parser.add_option('-n', '--newtrees', action='store_true', dest='newtrees', defa
 parser.add_option('-p', '--plots', action='store_true', dest='make_plots', default=False, help='make plots')
 parser.add_option('--savep', action='store_true', dest='savep', default=False, help='save plots')
 parser.add_option('--p2', action='store_true', dest='make_plots2', default=False, help='make parabel plot')
-parser.add_option('--p3', action='store_true', dest='make_plots3', default=False, help='plot')
-parser.add_option('--oldfunc', action='store_true', dest='oldfunc', default=False, help='use simple exponential for aTGC')
 parser.add_option('-b', action='store_true', dest='batch', default=False, help='batch mode')
 parser.add_option('-c', '--ch', dest='chan', default='elmu', help='channel, el, mu or elmu')
-parser.add_option('--makeratios', action='store_true', dest='make_ratios', default=False, help='make new WW/WZ ratios')
 parser.add_option('--noatgcint', action='store_true', dest='noatgcint', default=False, help='set atgc-interference coefficients to zero')
 parser.add_option('--printatgc', action='store_true', default=False, help='print atgc-interference contribution')
 parser.add_option('--yieldplots', action='store_true', default=False, help='make plots of relative yields')
@@ -70,7 +67,6 @@ class prepare_workspace_4limit:
 	    self.eps			= RooRealVar('slope_nuis','slope_nuis',1,0,2)
 	    self.eps.setConstant(kTRUE)
 	    self.eps4cbWZ		= RooFormulaVar('rel_slope_nuis4cbWZ','rel_slope_nuis4cbWZ','1+3*(@0-1)',RooArgList(self.eps))
-	    self.eps4cbWZ.setConstant(kTRUE)
 	    
 	    ##read workspace containing background pdfs
 	    fileInWs			= TFile.Open('Input/wwlvj_%s_HPV_workspace.root'%(self.ch))
@@ -83,6 +79,7 @@ class prepare_workspace_4limit:
 	#read trees containing aTGC WW and WZ events and fill them into histograms
 	def read_ATGCtree(self,ch='el'):
 
+	    #cut on MET has to be applied
 	    if self.ch=='el':
 		METCUT	= 80.
 	    elif self.ch=='mu':
@@ -94,7 +91,7 @@ class prepare_workspace_4limit:
 	    hists4scale	= {}
 	    
 	    for WV in ['WW','WZ']:
-		#create 3 histograms for each aTGC parameter (positive, negative and positive-negative wokring point)
+		#create 3 histograms for each aTGC parameter (positive, negative and positive-negative working point)
 		for para in self.POI:
 		    hists4scale['c_pos_%s_hist_%s'%(WV,para)]		= TH1F('c_pos_%s_hist_%s'%(WV,para),'c_pos_%s_hist_%s'%(WV,para),self.nbins,self.binlo,self.binhi);
 		    hists4scale['c_neg_%s_hist_%s'%(WV,para)]		= TH1F('c_neg_%s_hist_%s'%(WV,para),'c_neg_%s_hist_%s'%(WV,para),self.nbins,self.binlo,self.binhi);
@@ -151,16 +148,12 @@ class prepare_workspace_4limit:
 	    plots2		= []
 	    pads		= []
 	    
-	    rrv_x.setVal(2000)
-	    
 	    channel		= self.ch+'_'+cat
-	    
-	    binlotmp	= self.binlo
 
 	    for i in range(3):
 		rrv_x.setRange(self.binlo,self.binhi)
-		p       = rrv_x.frame(binlotmp,self.binhi)
-		p2	= rrv_x.frame(binlotmp,self.binhi)
+		p       = rrv_x.frame(self.binlo,self.binhi)
+		p2	= rrv_x.frame(self.binlo,self.binhi)
 		c       = TCanvas(self.POI[i]+'-',self.POI[i]+'-',1)
 		c.cd()
 		pad1	= TPad('pad1_%s'%self.POI[i],'pad1_%s'%self.POI[i],0.,0.25,1.,1.)
@@ -198,18 +191,15 @@ class prepare_workspace_4limit:
 		normvalneg = norm.getVal() * self.wtmp.data('SMdatahist_%s'%cat).sumEntries()
 		self.wtmp.pdf('aTGC_model_%s'%channel).plotOn(plots[i],RooFit.LineColor(kBlue),RooFit.Normalization(normvalneg, RooAbsReal.NumEvent),RooFit.Name('atgcmodel'))
 	
-
 		pullhist = plots[i].pullHist('atgcdata','atgcmodel')
 		
+		plotmax	= 100
 		if self.ch == 'el':
 		    plotmin = 1e-4
-		    #plotmin = 0.5
-		    plotmax = 100
 		    if cat == 'WZ':
 			plotmin = 3e-4
 		elif self.ch == 'mu':
 		    plotmin = 1e-2
-		    plotmax = 1e2
 		    if cat == 'WZ':
 			plotmin = 1e-3
 			plotmax = 50
@@ -241,7 +231,7 @@ class prepare_workspace_4limit:
 		leg.Print()
 		
 		pads[i][1].cd()
-		ratio_style = TH1D('ratio_style','ratio_style',(self.binhi-binlotmp)/100,binlotmp,self.binhi)
+		ratio_style = TH1D('ratio_style','ratio_style',(self.binhi-self.binlo)/100,self.binlo,self.binhi)
 		ratio_style.SetMarkerStyle(21)
 		ratio_style.SetMaximum(3)
 		ratio_style.SetMinimum(-3)
@@ -394,27 +384,13 @@ class prepare_workspace_4limit:
 		self.import_to_WS(self.wtmp,[pos_datahist,neg_datahist,dif_datahist])
 		self.import_to_WS(self.WS,[pos_datahist,neg_datahist,dif_datahist])
 		
-	#	#get scaling parabel from yields
+		#get scaling parabel from yields
 		hist4scale = TH1F('hist4scale_%s'%self.POI[i],'hist4scale_%s'%self.POI[i],3,-1.5*self.PAR_MAX[self.POI[i]],1.5*self.PAR_MAX[self.POI[i]])
 		hist4scale.SetBinContent(1,neg_datahist.sumEntries()/SMdatahist.sumEntries())
 		hist4scale.SetBinContent(2,1)
 		hist4scale.SetBinContent(3,pos_datahist.sumEntries()/SMdatahist.sumEntries())
 		#fit parabel
-		gROOT.SetBatch(True)
-		hist4scale.Fit('pol2')
-		if options.yieldplots:
-		    gROOT.SetBatch(False)
-		    cc1 = TCanvas();cc1.cd();
-		    hist4scale.GetXaxis().SetTitle(self.PAR_TITLES[self.POI[i]]+' (TeV^{-2})')
-		    hist4scale.GetYaxis().SetTitle('N_{events}^{SM+%s} / N_{events}^{SM}'%self.PAR_TITLES[self.POI[i]])
-		    hist4scale.GetYaxis().SetTitleSize(0.04)
-		    hist4scale.Draw()
-		    cc1.Update()
-		    cc1.SaveAs('docuplots/yields_%s.pdf'%s_name)
-		    cc1.SaveAs('docuplots/yields_%s.png'%%s_name)
-		    cc1.Close()
-		if not options.batch:
-			gROOT.SetBatch(False)
+		hist4scale.Fit('pol2','0')
 		fitfunc		= hist4scale.GetFunction('pol2')
 		par1		= RooRealVar('par1_%s'%s_name,'par1_%s'%s_name,fitfunc.GetParameter(1)); 		par1.setConstant(kTRUE);
 		par2		= RooRealVar('par2_%s'%s_name,'par2_%s'%s_name,fitfunc.GetParameter(2)); 		par2.setConstant(kTRUE);
@@ -425,7 +401,7 @@ class prepare_workspace_4limit:
 		
 		#scaleshape is the relative change to SM
 		scaleshape	= RooFormulaVar('scaleshape_%s'%s_name,'scaleshape_%s'%s_name, '(@1*@3+@2*@3**2)', RooArgList(par1,par2,self.wtmp.var(self.POI[i])))
-		#FIXME only very few atgc events for cb in WZ sample, doesn't work yet -> different parametrization, or leave out completly
+		#FIXME only very few atgc events for cb in WZ sample, fit doesn't work yet -> different parametrization, or leave out completly
 		if sample=='WZ' and self.POI[i]=='cb':
 		    N_lin		= RooRealVar('N_lin_%s'%s_name,'N_lin_%s'%s_name, 0)
 		    a2_4fit		= RooRealVar('a_quad_4fit_%s'%s_name,'a_quad_4fit_%s'%s_name,-0.1,-2,0.)
@@ -476,7 +452,6 @@ class prepare_workspace_4limit:
 		a7		= RooFormulaVar('a_ccw_cb_nuis_%s'%channel,'a_ccw_cb_nuis_%s'%channel,'@0*@1',RooArgList(a7_tmp,self.eps))
 
 	    
-
 	    Pdf_cwww_ccw	= RooExponential('Pdf_cwww_ccw_%s'%channel,'Pdf_cwww_ccw_%s'%channel,rrv_x,a5)
 	    Pdf_ccw_cb		= RooExponential('Pdf_ccw_cb_%s'%channel,'Pdf_ccw_cb_%s'%channel,rrv_x,a7)
 
@@ -675,27 +650,19 @@ class prepare_workspace_4limit:
 
 	    #read, rename and write bkg pdfs and bkg rates
 	    fileInWs	= TFile.Open('Input/wwlvj_%s_HPV_workspace.root'%self.ch)
-	    w		= fileInWs.Get('workspace4limit_') 
-	    for bkg in ['TTbar','STop','WW','WZ']:
-		getattr(self.WS,'import')(w.pdf('model_pdf_%s_mlvj_sig_%s'%(bkg,self.ch)).clone('mlvj_%s_sig_%s'%(bkg,self.ch)))
-	    w.var("rrv_number_WJets0_%s_mj"%self.ch).SetName("rrv_number_WJets_%s_mj"%self.ch)
-	    w.pdf('model_pdf_WJets0_%s_mj'%self.ch).SetName('model_pdf_WJets_%s_mj'%self.ch)
-	    w.pdf("model_pdf_WJets0_mlvj_sb_%s"%self.ch).SetName("model_pdf_WJets_mlvj_sb_%s"%self.ch)
-
-	    #make undecorrelated wjets model manually
-	    self.import_to_WS(self.WS,[RooProdPdf('mlvj_WJets_sig_%s'%self.ch,'mlvj_WJets_sig_%s'%self.ch,w.pdf("model_pdf_WJets_mlvj_sb_%s"%self.ch),w.pdf("correct_factor_pdf_Deco_WJets0_xww_sim_%s_HPV_mlvj_13TeV"%self.ch))])
+	    w_bkg	= fileInWs.Get('workspace4limit_') 
 
 	    path	='%s/src/CombinedEWKAnalysis/CommonTools/data/anomalousCoupling'%os.environ["CMSSW_BASE"]
 
 	    #import datasets for different regions
-	    getattr(self.WS,'import')(w.data('dataset_mj_sb_lo'))
-	    getattr(self.WS,'import')(w.data('dataset_mj_sb_hi'))
-	    getattr(self.WS,'import')(w.data('dataset_mj_sig'))
+	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sb_lo'))
+	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sb_hi'))
+	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sig'))
 
 	    for bkg in ['WJets','TTbar','STop','WW','WZ']:
 		print  "rrv_number_%s_%s_mj"%(bkg,self.ch)
-		getattr(self.WS,'import')(w.pdf('m_j_%s_%s'%(bkg,self.ch)).clone('mj_%s_%s'%(bkg,self.ch)))
-		getattr(self.WS,'import')(w.var("rrv_number_%s_%s_mj"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
+		getattr(self.WS,'import')(w_bkg.pdf('%s_mj_%s'%(bkg,self.ch)).clone('mj_%s_%s'%(bkg,self.ch)))
+		getattr(self.WS,'import')(w_bkg.var("rrv_number_%s_%s_mj"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
 
 	    #import m_pruned and set ranges
 	    getattr(self.WS,'import')(self.rrv_mass_j)
@@ -704,40 +671,34 @@ class prepare_workspace_4limit:
 	    self.WS.var('rrv_mass_j').setRange('sb_hi',105,150)
 	    self.WS.var('rrv_mass_lvj').setRange(900,3500)
 
-	    #bkg pdfs have the form 'mlvj_[bkg-name]_[region]_[ch]'
+	    #bkg-pdfs have the format '[bkg-name]_mlvj_[region]_[ch]' or '[bkg-name]_mj_[region]_[ch]'
 	    bkgs	= ['WJets','TTbar','WW','WZ','STop']
 	    regions	= ['sig','sb_lo','sb_hi']
 	    set_mj	= RooArgSet(self.WS2.var('rrv_mass_j'))
 
 	    for region in regions:
-		WS2	= self.WS.Clone("w")	#temporary workspace
+		self.WS2 = self.WS.Clone("w")	#temporary workspace
 		for bkg in bkgs:
 		    #define global norm for whole mj spectrum
 		    norm_var	= RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal())
 		    #define integral over region
-		    reg_Int		= self.WS2.pdf('mj_%s_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj), region)
+		    reg_Int		= w_bkg.pdf('%s_mj_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj, region)
 		    if bkg=='WJets':#norm floating for WJets, integral depends on (floating) shape parameter
 			norm_var.setConstant(kFALSE)
 			norm		= RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'@0*@1',RooArgList(reg_Int,norm_var))
 		    else:#norm and integral fixed for rest
 			norm_var.setConstant(kTRUE)
 			norm		= RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
-		    #signal region
-		    if region=='sig':
-			bkg_MWV	= self.WS2.pdf('mlvj_%s_sig_%s'%(bkg,self.ch))
-		    #sideband regions
-		    else:
-			print 'model_pdf_%s_mlvj_sb_%s'%(bkg,self.ch)
-			bkg_MWV	= w.pdf('model_pdf_%s_mlvj_sb_%s'%(bkg,self.ch)).clone('mlvj_%s_sb_%s'%(bkg,self.ch))
-			if bkg=='WJets':#all shape parameters of the W+Jets pdf in sideband region floating 
-			    params_mlvj	= bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
-			    p_iter	= params_mlvj.createIterator()
-			    p_iter.Reset()
-			    param	= p_iter.Next()
-			    while param:
-				param.setConstant(kFALSE)
+		    bkg_MWV	= w_bkg.pdf('%s_mlvj_%s_%s'%(bkg,region,self.ch))
+		    if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating 
+			params_mlvj	= bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
+			p_iter	= params_mlvj.createIterator()
+			p_iter.Reset()
+			param	= p_iter.Next()
+			while param:
+			    param.setConstant(kFALSE)
 				param	= p_iter.Next()
-		    bkg_mj	= w.pdf('m_j_%s_%s_pdf_%s'%(bkg,region,self.ch)).clone('mj_%s_%s_%s'%(bkg,region,self.ch))
+		    bkg_mj	= w_bkg.pdf('%s_mj_%s_pdf_%s'%(bkg,region,self.ch)).clone('mj_%s_%s_%s'%(bkg,region,self.ch))
 		    ###add el/mu to mj parameter names to have different parameters in the simultaneous fit
 		    params_mj	= bkg_mj.getParameters(self.WS2.data('dataset_mj_%s'%region))
 		    p_iter	= params_mj.createIterator()
@@ -757,11 +718,12 @@ class prepare_workspace_4limit:
 		    self.import_to_WS(WS2,[bkg_2d_pdf,norm],1)
 
 		#signal function for WW and WZ in signal region and lower/upper sideband
+		##signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible
 		for sample in ['WW','WZ']:
-		    sig_2d	= RooProdPdf('ATGCPdf_%s_%s_%s'%(sample,region,self.ch),'ATGCPdf_%s_%s_%s'%(sample,region,self.ch),RooArgList(self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)),w.pdf('m_j_%s_%s_pdf_%s'%(sample,region,self.ch))))
+		    sig_2d	= RooProdPdf('ATGCPdf_%s_%s_%s'%(sample,region,self.ch),'ATGCPdf_%s_%s_%s'%(sample,region,self.ch),RooArgList(self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)),w_bkg.pdf('m_j_%s_%s_pdf_%s'%(sample,region,self.ch))))
 		    norm_sig	= RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*@1',RooArgList(WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch)),self.WS2.function('normfactor_3d_%s_%s'%(self.ch,sample))))
 		    self.import_to_WS(WS2,[sig_2d,norm_sig],1)
-		getattr(WS2,'import')(w.data('dataset_mj_%s'%region).Clone('dataset_mj_%s_%s'%(region,self.ch)))
+		getattr(WS2,'import')(w_bkg.data('dataset_mj_%s'%region).Clone('dataset_mj_%s_%s'%(region,self.ch)))
 
 		output	= TFile('%s/%s_%s.root'%(path,region,self.ch),'recreate')
 		WS2.Write();
@@ -769,8 +731,6 @@ class prepare_workspace_4limit:
 		self.WS2.pdf('aTGC_model_%s_WZ'%self.ch).Write()
 		output.Close()
 		print 'Write to file ' + output.GetName()
-
-
 
 
 	    #make plots
@@ -822,6 +782,3 @@ if __name__ == '__main__':
     else:
 	makeWS	= prepare_workspace_4limit(options.chan,900,3500)
 	getattr(makeWS,'make_input')()
-
-
-
