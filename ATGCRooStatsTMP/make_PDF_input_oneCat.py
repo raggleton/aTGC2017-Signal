@@ -400,8 +400,8 @@ class prepare_workspace_4limit:
 		N_quad		= RooRealVar('N_quad_%s'%s_name,'N_quad_%s'%s_name, ((N_pos_tmp+N_neg_tmp)/2)-N_SM.getVal() )
 		
 		#scaleshape is the relative change to SM
-		scaleshape	= RooFormulaVar('scaleshape_%s'%s_name,'scaleshape_%s'%s_name, '(@1*@3+@2*@3**2)', RooArgList(par1,par2,self.wtmp.var(self.POI[i])))
-		#FIXME only very few atgc events for cb in WZ sample, fit doesn't work yet -> different parametrization, or leave out completly
+		scaleshape	= RooFormulaVar('scaleshape_%s'%s_name,'scaleshape_%s'%s_name, '(@0*@2+@1*@2**2)', RooArgList(par1,par2,self.wtmp.var(self.POI[i])))
+		#FIXME only very few atgc events for cb in WZ sample, fit doesn't work yet -> different parametrization, or leave out completely
 		if sample=='WZ' and self.POI[i]=='cb':
 		    N_lin		= RooRealVar('N_lin_%s'%s_name,'N_lin_%s'%s_name, 0)
 		    a2_4fit		= RooRealVar('a_quad_4fit_%s'%s_name,'a_quad_4fit_%s'%s_name,-0.1,-2,0.)
@@ -427,9 +427,9 @@ class prepare_workspace_4limit:
 
 		self.import_to_WS(self.wtmp,[cPdf_quad,cPdf_lin],1)
 		self.import_to_WS(self.wtmp,[N_quad,N_lin,scaleshape])
-		self.wtmp.Print()
 		
-	    #make model
+	    ###make model
+	    #list of all coefficients
 	    paralist	= RooArgList(N_SM)
 
 	    #include aTGC-interference
@@ -438,19 +438,16 @@ class prepare_workspace_4limit:
 	    w2		= fileInter.Get('w2')
 
 	    #get parameter values of aTGC-interference from generator level studies	
-	    a5		= w2.var('a5').getVal()
-	    a5_tmp	= RooRealVar('a_cwww_ccw_%s'%channel,'a_cwww_ccw_%s'%channel,a5)
-	    a7		= w2.var('a7').getVal()
-	    a7_tmp	= RooRealVar('a_ccw_cb_%s'%channel,'a_ccw_cb_%s'%channel,a7)
+	    a5_tmp	= RooRealVar('a_cwww_ccw_%s'%channel,'a_cwww_ccw_%s'%channel, w2.var('a5').getVal())
+	    a7_tmp	= RooRealVar('a_ccw_cb_%s'%channel,'a_ccw_cb_%s'%channel, w2.var('a7').getVal())
 	    a5_tmp.setConstant(kTRUE)
 	    a7_tmp.setConstant(kTRUE)
-	    #apply uncertainty parameter, bigger uncertainty for c_B in WZ category
+	    #apply uncertainty parameter, bigger uncertainty for c_B in WZ
 	    a5		= RooFormulaVar('a_cwww_ccw_nuis_%s'%channel,'a_cwww_ccw_nuis_%s'%channel,'@0*@1',RooArgList(a5_tmp,self.eps))
 	    if sample=='WZ':
 		a7		= RooFormulaVar('a_ccw_cb_nuis_%s'%channel,'a_ccw_cb_nuis_%s'%channel,'@0*@1',RooArgList(a7_tmp,self.eps4cbWZ))
 	    else:
 		a7		= RooFormulaVar('a_ccw_cb_nuis_%s'%channel,'a_ccw_cb_nuis_%s'%channel,'@0*@1',RooArgList(a7_tmp,self.eps))
-
 	    
 	    Pdf_cwww_ccw	= RooExponential('Pdf_cwww_ccw_%s'%channel,'Pdf_cwww_ccw_%s'%channel,rrv_x,a5)
 	    Pdf_ccw_cb		= RooExponential('Pdf_ccw_cb_%s'%channel,'Pdf_ccw_cb_%s'%channel,rrv_x,a7)
@@ -479,7 +476,7 @@ class prepare_workspace_4limit:
 	    N60		= w2.var('N_cb_60').getVal()
 	    N60_	= w2.var('N_cb__60').getVal()
 
-	    ##no cwww-cb interference
+	    ##define final coefficients, scaled by cf
 	    N_cwww_ccw	= RooRealVar('N_cwww_ccw_%s'%channel,'N_cwww_ccw_%s'%channel,\
 					    cf*((N1220+NSM_gen)-(N12+N20)))
 	    N_ccw_cb	= RooRealVar('N_ccw_cb_%s'%channel,'N_ccw_cb_%s'%channel,\
@@ -489,7 +486,8 @@ class prepare_workspace_4limit:
 				    self.wtmp.function('N_quad_%s_%s'%(self.POI[1],channel)),self.wtmp.function('N_lin_%s_%s'%(self.POI[1],channel)),self.wtmp.var('ccw'),\
 				    self.wtmp.function('N_quad_%s_%s'%(self.POI[2],channel)),self.wtmp.function('N_lin_%s_%s'%(self.POI[2],channel)),self.wtmp.var('cb')))
 	    paralist.add(RooArgList(N_cwww_ccw,N_ccw_cb))
-	    #neglect SM interference for cwww
+	    
+	    #parts of final signal model formula
 	    cwww_s		= '+@1*(@2/12)**2'
 	    ccw_s		= '+@3*(@5/20)**2+@4*(@5/20)'
 	    cb_s		= '+@6*(@8/60)**2+@7*(@8/60)'
@@ -560,6 +558,7 @@ class prepare_workspace_4limit:
 		    self.wtmp.var('Erf_offset_%s'%s_name).setConstant(kTRUE)
 		    self.wtmp.var('Erf_width_%s'%s_name).setConstant(kTRUE)
 		self.fitresults.append(fitres2)
+		
 	    for i in range(3):
 		self.wtmp.var(self.POI[i]).setVal(0)
 	    
@@ -659,13 +658,14 @@ class prepare_workspace_4limit:
 	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sb_hi'))
 	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sig'))
 
+	    w_bkg.allPdfs().Print("V")
 	    for bkg in ['WJets','TTbar','STop','WW','WZ']:
 		print  "rrv_number_%s_%s_mj"%(bkg,self.ch)
-		getattr(self.WS,'import')(w_bkg.pdf('%s_mj_%s'%(bkg,self.ch)).clone('mj_%s_%s'%(bkg,self.ch)))
-		getattr(self.WS,'import')(w_bkg.var("rrv_number_%s_%s_mj"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
+		#getattr(self.WS,'import')(w_bkg.pdf('%s_mj_%s'%(bkg,self.ch)))#.clone('mj_%s_%s'%(bkg,self.ch)))
+		getattr(self.WS,'import')(w_bkg.var("rrv_number_mj_%s_%s"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
 
 	    #import m_pruned and set ranges
-	    getattr(self.WS,'import')(self.rrv_mass_j)
+	    getattr(self.WS,'import')(w_bkg.var('rrv_mass_j'))
 	    self.WS.var('rrv_mass_j').setRange('sb_lo',40,65)
 	    self.WS.var('rrv_mass_j').setRange('sig',65,105)
 	    self.WS.var('rrv_mass_j').setRange('sb_hi',105,150)
@@ -674,10 +674,11 @@ class prepare_workspace_4limit:
 	    #bkg-pdfs have the format '[bkg-name]_mlvj_[region]_[ch]' or '[bkg-name]_mj_[region]_[ch]'
 	    bkgs	= ['WJets','TTbar','WW','WZ','STop']
 	    regions	= ['sig','sb_lo','sb_hi']
-	    set_mj	= RooArgSet(self.WS2.var('rrv_mass_j'))
 
+	    #create a workspace for each component in each region
 	    for region in regions:
-		self.WS2 = self.WS.Clone("w")	#temporary workspace
+		self.WS2 = self.WS.Clone("w")	#temporary 
+		set_mj	= RooArgSet(self.WS2.var('rrv_mass_j'))
 		for bkg in bkgs:
 		    #define global norm for whole mj spectrum
 		    norm_var	= RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal())
@@ -690,6 +691,8 @@ class prepare_workspace_4limit:
 			norm_var.setConstant(kTRUE)
 			norm		= RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
 		    bkg_MWV	= w_bkg.pdf('%s_mlvj_%s_%s'%(bkg,region,self.ch))
+		    print '%s_mlvj_%s_%s'%(bkg,region,self.ch)
+		    bkg_MWV.Print()
 		    if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating 
 			params_mlvj	= bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
 			p_iter	= params_mlvj.createIterator()
@@ -697,8 +700,8 @@ class prepare_workspace_4limit:
 			param	= p_iter.Next()
 			while param:
 			    param.setConstant(kFALSE)
-				param	= p_iter.Next()
-		    bkg_mj	= w_bkg.pdf('%s_mj_%s_pdf_%s'%(bkg,region,self.ch)).clone('mj_%s_%s_%s'%(bkg,region,self.ch))
+			    param	= p_iter.Next()
+		    bkg_mj	= w_bkg.pdf('mj_%s_%s_%s'%(bkg,region,self.ch))
 		    ###add el/mu to mj parameter names to have different parameters in the simultaneous fit
 		    params_mj	= bkg_mj.getParameters(self.WS2.data('dataset_mj_%s'%region))
 		    p_iter	= params_mj.createIterator()
@@ -715,18 +718,18 @@ class prepare_workspace_4limit:
 		    bkg_2d_pdf		= RooProdPdf(bkg,bkg,RooArgList(bkg_MWV,bkg_mj))
 		    bkg_MWV.Print();bkg_mj.Print();bkg_2d_pdf.Print();
 		    norm.SetName(bkg_2d_pdf.GetName()+'_norm')
-		    self.import_to_WS(WS2,[bkg_2d_pdf,norm],1)
+		    self.import_to_WS(self.WS2,[bkg_2d_pdf,norm],1)
 
 		#signal function for WW and WZ in signal region and lower/upper sideband
 		##signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible
 		for sample in ['WW','WZ']:
 		    sig_2d	= RooProdPdf('ATGCPdf_%s_%s_%s'%(sample,region,self.ch),'ATGCPdf_%s_%s_%s'%(sample,region,self.ch),RooArgList(self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)),w_bkg.pdf('m_j_%s_%s_pdf_%s'%(sample,region,self.ch))))
-		    norm_sig	= RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*@1',RooArgList(WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch)),self.WS2.function('normfactor_3d_%s_%s'%(self.ch,sample))))
-		    self.import_to_WS(WS2,[sig_2d,norm_sig],1)
-		getattr(WS2,'import')(w_bkg.data('dataset_mj_%s'%region).Clone('dataset_mj_%s_%s'%(region,self.ch)))
+		    norm_sig	= RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch)),self.WS2.function('normfactor_3d_%s_%s'%(self.ch,sample))))
+		    self.import_to_WS(self.WS2,[sig_2d,norm_sig],1)
+		getattr(self.WS2,'import')(w_bkg.data('dataset_mj_%s'%region).Clone('dataset_mj_%s_%s'%(region,self.ch)))
 
 		output	= TFile('%s/%s_%s.root'%(path,region,self.ch),'recreate')
-		WS2.Write();
+		self.WS2.Write();
 		self.WS2.pdf('aTGC_model_%s_WW'%self.ch).Write()
 		self.WS2.pdf('aTGC_model_%s_WZ'%self.ch).Write()
 		output.Close()
