@@ -664,6 +664,9 @@ class prepare_workspace_4limit:
 		#getattr(self.WS,'import')(w_bkg.pdf('%s_mj_%s'%(bkg,self.ch)))#.clone('mj_%s_%s'%(bkg,self.ch)))
 		getattr(self.WS,'import')(w_bkg.var("rrv_number_mj_%s_%s"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
 
+            #set parameter in mj-WJets floating
+            w_bkg.var("rrv_c_ErfExp_WJets0_%s"%self.ch).setConstant(kFALSE)
+
 	    #import m_pruned and set ranges
 	    getattr(self.WS,'import')(w_bkg.var('rrv_mass_j'))
 	    self.WS.var('rrv_mass_j').setRange('sb_lo',40,65)
@@ -683,15 +686,18 @@ class prepare_workspace_4limit:
 		    #define global norm for whole mj spectrum
 		    norm_var	= RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal())
 		    #define integral over region
-		    reg_Int		= w_bkg.pdf('%s_mj_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj, region)
+		    reg_Int		= w_bkg.pdf('mj_%s_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj, region)
 		    if bkg=='WJets':#norm floating for WJets, integral depends on (floating) shape parameter
 			norm_var.setConstant(kFALSE)
 			norm		= RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'@0*@1',RooArgList(reg_Int,norm_var))
 		    else:#norm and integral fixed for rest
 			norm_var.setConstant(kTRUE)
 			norm		= RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
-		    bkg_MWV	= w_bkg.pdf('%s_mlvj_%s_%s'%(bkg,region,self.ch))
-		    print '%s_mlvj_%s_%s'%(bkg,region,self.ch)
+                    if regions == 'sig':
+                        bkg_MWV = w_bkg.pdf('%s_mlvj_sig_%s'%(bkg,self.ch))
+                    else:
+                        #pdfs form the sb fit are fitted simultaneously in the lower and upper sb
+                        bkg_MWV = w_bkg.pdf('%s_mlvj_sb_%s'%(bkg,self.ch)).clone('%s_mlvj_%s_%s'%(bkg,region,self.ch))
 		    bkg_MWV.Print()
 		    if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating 
 			params_mlvj	= bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
@@ -701,19 +707,7 @@ class prepare_workspace_4limit:
 			while param:
 			    param.setConstant(kFALSE)
 			    param	= p_iter.Next()
-		    bkg_mj	= w_bkg.pdf('mj_%s_%s_%s'%(bkg,region,self.ch))
-		    ###add el/mu to mj parameter names to have different parameters in the simultaneous fit
-		    params_mj	= bkg_mj.getParameters(self.WS2.data('dataset_mj_%s'%region))
-		    p_iter	= params_mj.createIterator()
-		    p_iter.Reset()
-		    param 	= p_iter.Next()
-		    while param:
-			if self.ch not in param.GetName():
-			    param.SetName(param.GetName()+'_'+self.ch)
-			if 'rrv_c_ErfExp_WJets0' in param.GetName():
-			    #one shape parameter of W+Jets is floating
-			    param.setConstant(kFALSE)
-			param	= p_iter.Next()
+		    bkg_mj	= w_bkg.pdf('%s_mj_%s_%s'%(bkg,region,self.ch))
 		    #make 2d pdf
 		    bkg_2d_pdf		= RooProdPdf(bkg,bkg,RooArgList(bkg_MWV,bkg_mj))
 		    bkg_MWV.Print();bkg_mj.Print();bkg_2d_pdf.Print();
@@ -721,10 +715,14 @@ class prepare_workspace_4limit:
 		    self.import_to_WS(self.WS2,[bkg_2d_pdf,norm],1)
 
 		#signal function for WW and WZ in signal region and lower/upper sideband
-		##signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible
+		##FIXME? signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible there
+                ##FIXME aTGC not scaled in sideband region!
 		for sample in ['WW','WZ']:
 		    sig_2d	= RooProdPdf('ATGCPdf_%s_%s_%s'%(sample,region,self.ch),'ATGCPdf_%s_%s_%s'%(sample,region,self.ch),RooArgList(self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)),w_bkg.pdf('m_j_%s_%s_pdf_%s'%(sample,region,self.ch))))
-		    norm_sig	= RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch)),self.WS2.function('normfactor_3d_%s_%s'%(self.ch,sample))))
+                    if region == 'sig':
+        		    norm_sig	= RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch)),self.WS2.function('normfactor_3d_%s_%s'%(self.ch,sample))))
+                    else:
+                        norm_sig	= RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*1',RooArgList(self.WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch))))
 		    self.import_to_WS(self.WS2,[sig_2d,norm_sig],1)
 		getattr(self.WS2,'import')(w_bkg.data('dataset_mj_%s'%region).Clone('dataset_mj_%s_%s'%(region,self.ch)))
 
