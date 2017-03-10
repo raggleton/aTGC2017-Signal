@@ -53,7 +53,7 @@ class prepare_workspace_4limit:
 	    
 	    self.mj_lo			= 65.			#lower bound of the signal region
 	    self.mj_hi			= 105.			#upper bound
-	    self.binlo			= mlvj_lo		#lower bound on ivariant mass
+	    self.binlo			= mlvj_lo		#lower bound on invariant mass
 	    self.binhi			= mlvj_hi		#upper bound
 
 	    self.channel		= "WV_"+self.ch
@@ -134,7 +134,7 @@ class prepare_workspace_4limit:
 			hists4scale['c_dif_%s_hist_cb'%WV].Fill(MWW,aTGC[4]-aTGC[5])
 			    
 	    #write histograms to file
-	    fileOut	= TFile.Open('Output/hists4scale_%s_WV_aTGC-%s_%s.root'%(self.ch,self.binlo4fit,self.binhi),'recreate')
+	    fileOut	= TFile.Open('Output/hists4scale_%s_WV_aTGC-%s_%s.root'%(self.ch,self.binlo,self.binhi),'recreate')
 	    for key in hists4scale:
 		hists4scale[key].Write()
 	    print '--------> Written to file ' + fileOut.GetName()
@@ -217,7 +217,6 @@ class prepare_workspace_4limit:
 		ndof	= (self.binhi-self.binlo)/100 - 4
 		plots[i].Print()
 		#print calculate_chi2(self.wtmp.data('neg_datahist4fit_%s'%self.POI[i]),rrv_x,pullhist,plots[i],ndof,1)
-
 		
 		parlatex	= ['#frac{c_{WWW}}{#Lambda^{2}}','#frac{c_{W}}{#Lambda^{2}}','#frac{c_{B}}{#Lambda^{2}}']
 		leg	= TLegend(0.11,0.2,0.4,0.6)
@@ -287,12 +286,6 @@ class prepare_workspace_4limit:
 		    
 	    if not options.batch:
 		raw_input('plots plotted')
-	    for i in range(3):
-		can[i].Delete()
-		can2[i].Delete()
-		for j in range(4):
-		    pads[i][j].Delete()
-
 
 	def calculate_chi2(hist,rrv_x,pullhist,mplot_orig,ndof,ismj):
 	    pulls = array('d',[])
@@ -380,7 +373,7 @@ class prepare_workspace_4limit:
 		dif_datahist		= RooDataHist('dif_datahist_%s_%s'%(sample,self.POI[i]),'dif_datahist_%s_%s'%(sample,self.POI[i]),RooArgList(rrv_x),fileInHist.Get('c_dif_%s_hist_%s'%(sample,self.POI[i])))
 		fileInHist.Close()
 		
-		#import datasets to self.wtmp and final workspace WS
+		#import datasets to wtmp and final workspace WS
 		self.import_to_WS(self.wtmp,[pos_datahist,neg_datahist,dif_datahist])
 		self.import_to_WS(self.WS,[pos_datahist,neg_datahist,dif_datahist])
 		
@@ -654,20 +647,18 @@ class prepare_workspace_4limit:
 	    path	='%s/src/CombinedEWKAnalysis/CommonTools/data/anomalousCoupling'%os.environ["CMSSW_BASE"]
 
 	    #import datasets for different regions
-	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sb_lo'))
-	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sb_hi'))
-	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sig'))
+	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sb_lo_%s'%self.ch))
+	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sb_hi_%s'%self.ch))
+	    getattr(self.WS,'import')(w_bkg.data('dataset_mj_sig_%s'%self.ch))
 
-	    w_bkg.allPdfs().Print("V")
 	    for bkg in ['WJets','TTbar','STop','WW','WZ']:
 		print  "rrv_number_%s_%s_mj"%(bkg,self.ch)
-		#getattr(self.WS,'import')(w_bkg.pdf('%s_mj_%s'%(bkg,self.ch)))#.clone('mj_%s_%s'%(bkg,self.ch)))
 		getattr(self.WS,'import')(w_bkg.var("rrv_number_mj_%s_%s"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
 
-            #set parameter in mj-WJets floating
+            #set shape parameter in mj-WJets floating
             w_bkg.var("rrv_c_ErfExp_WJets0_%s"%self.ch).setConstant(kFALSE)
 
-	    #import m_pruned and set ranges
+	    #import m_pruned and define ranges
 	    getattr(self.WS,'import')(w_bkg.var('rrv_mass_j'))
 	    self.WS.var('rrv_mass_j').setRange('sb_lo',40,65)
 	    self.WS.var('rrv_mass_j').setRange('sig',65,105)
@@ -690,16 +681,16 @@ class prepare_workspace_4limit:
 		    if bkg=='WJets':#norm floating for WJets, integral depends on (floating) shape parameter
 			norm_var.setConstant(kFALSE)
 			norm		= RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'@0*@1',RooArgList(reg_Int,norm_var))
-		    else:#norm and integral fixed for rest
+		    else:#norm and integral fixed for rest##FIXME TTbar should float with gaussian constraint
 			norm_var.setConstant(kTRUE)
 			norm		= RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
                     if regions == 'sig':
                         bkg_MWV = w_bkg.pdf('%s_mlvj_sig_%s'%(bkg,self.ch))
                     else:
-                        #pdfs form the sb fit are fitted simultaneously in the lower and upper sb
+                        #pdfs from the sb fit are fitted simultaneously in the lower and upper sb
                         bkg_MWV = w_bkg.pdf('%s_mlvj_sb_%s'%(bkg,self.ch)).clone('%s_mlvj_%s_%s'%(bkg,region,self.ch))
 		    bkg_MWV.Print()
-		    if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating 
+		    if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating ##FIXME can already be done in prepare_bkg_oneCat.py
 			params_mlvj	= bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
 			p_iter	= params_mlvj.createIterator()
 			p_iter.Reset()
@@ -716,7 +707,8 @@ class prepare_workspace_4limit:
 
 		#signal function for WW and WZ in signal region and lower/upper sideband
 		##FIXME? signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible there
-                ##FIXME aTGC not scaled in sideband region!
+                ##FIXME aTGC not scaled in sideband region?
+                getattr(self.WS2,'import')(w_bkg.data('dataset_mj_%s_%s'%(region,self.ch)))
 		for sample in ['WW','WZ']:
 		    sig_2d	= RooProdPdf('ATGCPdf_%s_%s_%s'%(sample,region,self.ch),'ATGCPdf_%s_%s_%s'%(sample,region,self.ch),RooArgList(self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)),w_bkg.pdf('m_j_%s_%s_pdf_%s'%(sample,region,self.ch))))
                     if region == 'sig':
@@ -724,14 +716,13 @@ class prepare_workspace_4limit:
                     else:
                         norm_sig	= RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*1',RooArgList(self.WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch))))
 		    self.import_to_WS(self.WS2,[sig_2d,norm_sig],1)
-		getattr(self.WS2,'import')(w_bkg.data('dataset_mj_%s'%region).Clone('dataset_mj_%s_%s'%(region,self.ch)))
-
-		output	= TFile('%s/%s_%s.root'%(path,region,self.ch),'recreate')
-		self.WS2.Write();
-		self.WS2.pdf('aTGC_model_%s_WW'%self.ch).Write()
-		self.WS2.pdf('aTGC_model_%s_WZ'%self.ch).Write()
-		output.Close()
-		print 'Write to file ' + output.GetName()
+		
+                for sample in ['WW','WZ']:
+		        output	= TFile('%s/%s_%s_%s.root'%(path,sample,region,self.ch),'recreate')
+		        self.WS2.Write();
+		        self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)).Write()
+		        output.Close()
+		        print 'Write to file ' + output.GetName()
 
 
 	    #make plots
