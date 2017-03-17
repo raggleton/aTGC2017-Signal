@@ -26,7 +26,7 @@ parser.add_option('--noatgcint', action='store_true', dest='noatgcint', default=
 parser.add_option('--printatgc', action='store_true', default=False, help='print atgc-interference contribution')
 parser.add_option('--yieldplots', action='store_true', default=False, help='make plots of relative yields')
 parser.add_option('--atgc', action='store_true', dest='atgc', default=False, help='use anomalous coupling parametrization instead of EFT')
-parser.add_option("--config",dest="config",help="The name of the input configuration file.")
+parser.add_option("--config",dest="config",default='config_simfit',help="The name of the input configuration file.")
 
 
 (options,args) = parser.parse_args()
@@ -78,9 +78,13 @@ class Prepare_workspace_4limit:
             self.rrv_mass_lvj.setRange(self.binlo,self.binhi)
             self.rrv_mass_j             = w.var('rrv_mass_j')
 
+            #names of bkg contributions and regions
+            self.bkgs        = ['WJets','TTbar','WW','WZ','STop']
+            self.regions     = ['sig','sb_lo','sb_hi']
+
             #read config##FIXME adjust naming
-            #self.cfg = SafeConfigParser()
-            #self.cfg.read(options.config)
+            self.cfg = SafeConfigParser()
+            self.cfg.read(options.config)
 
 
         #read trees containing aTGC WW and WZ events and fill them into histograms
@@ -611,82 +615,90 @@ class Prepare_workspace_4limit:
                 print N_list.at(i).GetName() + ' : ' + str(N_list.at(i).getVal())
 
 
-        def Write_datacard(bkgs=[],regions=[],WV='WW'):
+        def Write_datacard(self):
             ### make the card for this channel and plane ID
-            for bkg in bkgs:
-                for region in regions:
-                    codename = WV + region + self.ch
-                    norm_sig
-                    norm_bkg
-                    Nbkg_int
-                    bkg_name[i]
+
+            for region in self.regions:
+                codename    = 'WWWZ_' + region + '_' + self.ch
+                cfg_items   = self.cfg.items('Global')
+                NlnN        = int(self.cfg.get('Global','nlnn'))
+                lnN_for     = []
+                lnN_name    = []
+                lnN_value   = []
+                bkgs_4card  = ['WJets','STop','TTbar']
+                Nbkg_int    = len(bkgs_4card)
+                for i in range(0,NlnN):
+                    lnN_for.append([])
+                    for name in self.cfg.get('Global','lnN%i_for'%(i+1)).split(','):
+                        lnN_for[i].append(name)
+                    lnN_name.append(self.cfg.get('Global','lnN%i_name'%(i+1)))
+                    lnN_value.append([])
+                    for value in self.cfg.get('Global','lnN%i_value'%(i+1)).split(','):
+                        lnN_value[i].append(value)
 
 
 
-                    card = """
+                card = """
 imax 1  number of channels
 jmax {Nbkg_int}  number of backgrounds
 kmax *  number of nuisance parameters (sources of systematical uncertainties)
-                ------------""".format(Nbkg_int=Nbkg_int)
-                    for i in range(0,Nbkg_int):
-                        card += """
-shapes {bkg_name}\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,bkg_name=bkg_name[i])
+            ------------""".format(Nbkg_int=Nbkg_int)
+                for i in range(0,Nbkg_int):
                     card += """
+shapes {bkg_name}\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,bkg_name=bkgs_4card[i])
+                card += """
 shapes data_obs\t\t\t\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename)    
-                    card += """   
+                card += """   
 shapes ATGCPdf_{codename}\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS
-                """.format(codename=codename)
-                        
-                    card += """   
+            """.format(codename=codename)
+                card += """   
 ------------
 bin {codename} 
 observation -1
 ------------
-bin                         {codename}\t\t""".format(codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg)
-
-                    for i in range(0,Nbkg_int):
-                        card += """\t\t\t{codename}""".format(codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg[i])
-
-                    card += """       
-process\t\t\t    ATGCPdf_{codename}    """.format(codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg[i])
-
-                    for i in range(0,Nbkg_int):
-                        card += """\t\t{bkg_name}""".format(Nbkg_int=i+1,codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg[i],bkg_name=bkg_name[i])
-
-                    card += """       
-process                     0                        """.format(codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg[i])
-
-                    for i in range(0,Nbkg_int):
-                        card += """ \t\t\t\t{i}""".format(i=i+1,codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg[i])
-                        
-                    card += """       
-rate                        {norm_sig_sm}\t""".format(codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg[i])
-
-                    for i in range(0,Nbkg_int):
-                        card += """ \t\t\t{norm_bkg}""".format(codename=codename,norm_sig_sm=norm_sig_sm,norm_bkg=norm_bkg[i])
-                    card += """           
-------------
-"""
-                    for i in range(0,NlnN):
-                        # if found signal or codename in the list of names that are affected by lnN unc:
-                        if (('%s_signal'%codename in lnN_for[i]) or (any(codename in s for s in lnN_for[i]))):
-                            card+="""
+bin                         {codename}\t\t""".format(codename=codename)
+                for i in range(0,Nbkg_int):
+                    card += """\t\t\t{codename}""".format(codename=codename)
+                card += """       
+process\t\t\t    ATGCPdf_{codename}    """.format(codename=codename)
+                for i in range(0,Nbkg_int):
+                    card += """\t\t{bkg_name}""".format(bkg_name=bkgs_4card[i])
+                card += """       
+process                     0                        """
+                for i in range(0,Nbkg_int):
+                    card += """ \t\t\t\t{i}""".format(i=i+1)
+                card += """       
+rate                        1\t"""
+                for i in range(0,Nbkg_int):
+                    card += """ \t\t\t1"""
+                card += """           
+------------"""
+                for i in range(0,NlnN):
+                    # if found signal or codename in the list of names that are affected by lnN unc:
+                    if (('%s_signal'%codename in lnN_for[i]) or (any(codename in s for s in lnN_for[i]))):
+                        card+="""
 {lnN_name} \t\t\t lnN """.format(lnN_name=lnN_name[i])
-                            if ('%s_signal'%codename in lnN_for[i]):
-                                # if lnN syst affects signal:
-                                index_s=lnN_for[i].index('%s_signal'%codename)
-                                card+=""" {lnN_value}      """.format(lnN_value=lnN_value[i][index_s])
+                        if ('%s_signal'%codename in lnN_for[i]):
+                            # if lnN syst affects signal:
+                            index_s=lnN_for[i].index('%s_signal'%codename)
+                            card+=""" {lnN_value}      """.format(lnN_value=lnN_value[i][index_s])
+                        else:
+                            card+=""" -      """
+                        for j in range(0,Nbkg_int):
+                            name_for_lnN=codename
+                            name_for_lnN+='_'
+                            name_for_lnN+=bkgs_4card[j]
+                            if (name_for_lnN in lnN_for[i]):
+                                index=lnN_for[i].index(name_for_lnN)
+                                card+="""\t\t\t\t{lnN_value}""".format(lnN_value=lnN_value[i][index])
                             else:
-                                card+=""" -      """
-                            for j in range(0,Nbkg_int):
-                                name_for_lnN=codename
-                                name_for_lnN+='_'
-                                name_for_lnN+=bkg_name[j]
-                                if (name_for_lnN in lnN_for[i]):
-                                    index=lnN_for[i].index(name_for_lnN)
-                                    card+="""\t\t\t\t{lnN_value}""".format(lnN_value=lnN_value[i][index])
-                                else:
-                                    card+="""\t\t\t\t-"""
+                                card+="""\t\t\t\t-"""
+
+                print card
+                cardfile = open('aC_%s.txt'%(codename),'w')
+                cardfile.write(card)
+                cardfile.close()
+                    #cardfilenames.append('aC_%s.txt'%(codename))
 
 
         ########################
@@ -727,78 +739,84 @@ rate                        {norm_sig_sm}\t""".format(codename=codename,norm_sig
             self.WS.var('rrv_mass_lvj').setRange(900,3500)
 
             #bkg-pdfs have the format '[bkg-name]_mlvj_[region]_[ch]' or '[bkg-name]_mj_[region]_[ch]'
-            bkgs        = ['WJets','TTbar','WW','WZ','STop']
-            regions        = ['sig','sb_lo','sb_hi']
+
 
             #create a workspace for each component in each region
-            for region in regions:
+            for region in self.regions:
                 self.WS2 = self.WS.Clone("w")        #temporary 
                 set_mj        = RooArgSet(self.WS2.var('rrv_mass_j'))
-                for bkg in bkgs:
+                for bkg in self.bkgs:
                     #define global norm for whole mj spectrum
-                    norm_var        = RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal())
+                    norm_var    = RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal(),0,1e4)
                     #define integral over region
-                    reg_Int                = w_bkg.pdf('mj_%s_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj, region)
+                    reg_Int     = w_bkg.pdf('mj_%s_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj, region)
                     if bkg=='WJets':#norm floating for WJets, integral depends on (floating) shape parameter
                         norm_var.setConstant(kFALSE)
-                        norm                = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'@0*@1',RooArgList(reg_Int,norm_var))
+                        norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'@0*@1',RooArgList(reg_Int,norm_var))
                     else:#norm and integral fixed for rest
                         norm_var.setConstant(kTRUE)
-                        norm                = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
-                    if regions == 'sig':
-                        bkg_MWV = w_bkg.pdf('%s_mlvj_sig_%s'%(bkg,self.ch))
+                        norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
+                    if self.regions == 'sig':
+                        bkg_MWV     = w_bkg.pdf('%s_mlvj_sig_%s'%(bkg,self.ch))
                     else:
                         #pdfs from the sb fit are fitted simultaneously in the lower and upper sb
                         bkg_MWV = w_bkg.pdf('%s_mlvj_sb_%s'%(bkg,self.ch)).clone('%s_mlvj_%s_%s'%(bkg,region,self.ch))
-                    bkg_MWV.Print()
-                    if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating ##FIXME should already be done in prepare_bkg_oneCat.py
-                        params_mlvj        = bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
-                        p_iter        = params_mlvj.createIterator()
-                        p_iter.Reset()
-                        param        = p_iter.Next()
-                        while param:
-                            param.setConstant(kFALSE)
-                            param        = p_iter.Next()
-                    bkg_mj        = w_bkg.pdf('%s_mj_%s_%s'%(bkg,region,self.ch))
+                    #if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating ##FIXME should already be done in prepare_bkg_oneCat.py
+                    #    params_mlvj   = bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
+                    #    p_iter        = params_mlvj.createIterator()
+                    #    p_iter.Reset()
+                    #    param        = p_iter.Next()
+                    #    while param:
+                    #        param.setConstant(kFALSE)
+                    #        param        = p_iter.Next()
+                    bkg_mj          = w_bkg.pdf('%s_mj_%s_%s'%(bkg,region,self.ch))
                     #make 2d pdf
-                    bkg_2d_pdf                = RooProdPdf(bkg,bkg,RooArgList(bkg_MWV,bkg_mj))
+                    bkg_2d_pdf      = RooProdPdf(bkg,bkg,RooArgList(bkg_MWV,bkg_mj))
                     bkg_MWV.Print();bkg_mj.Print();bkg_2d_pdf.Print();
-                    norm.SetName(bkg_2d_pdf.GetName()+'_norm')
+                    norm.SetName(bkg_2d_pdf.GetName()+'_norm')#the normalization variable must have the corresponding pdf-name + _norm
                     self.Import_to_ws(self.WS2,[bkg_2d_pdf,norm],1)
 
                 #signal function for WW and WZ in signal region and lower/upper sideband
+                #
                 ##FIXME? signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible there
-                ##FIXME aTGC not scaled in sideband region? remove it?
                 ##FIXME need only one pdf for WW and WZ
-                getattr(self.WS2,'import')(w_bkg.data('dataset_2d_%s_%s'%(region,self.ch)).Clone('data_obs'))
+                data_obs            = RooDataSet('data_obs','data_obs',w_bkg.data('dataset_2d_%s_%s'%(region,self.ch)),RooArgSet(self.WS2.var('rrv_mass_lvj'),self.WS2.var('mj_%s'%region)))
+                getattr(self.WS2,'import')(data_obs)
+
+                pdf_atgc_mlvj_WW    = self.WS2.pdf('aTGC_model_%s_WW'%self.ch)
+                pdf_atgc_mlvj_WZ    = self.WS2.pdf('aTGC_model_%s_WZ'%self.ch)
+                pdf_atgc_mj_WW      = w_bkg.pdf('m_j_WW_%s_pdf_%s'%(region,self.ch))
+                pdf_atgc_mj_WZ      = w_bkg.pdf('m_j_WZ_%s_pdf_%s'%(region,self.ch))
+
+                pdf_atgc_WW_2d  = RooProdPdf('ATGCPdf_WW_2d_%s_%s'%(region,self.ch),'ATGCPdf_WW_2d_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_mlvj_WW,pdf_atgc_mj_WW))
+                pdf_atgc_WZ_2d  = RooProdPdf('ATGCPdf_WZ_2d_%s_%s'%(region,self.ch),'ATGCPdf_WZ_2d_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_mlvj_WZ,pdf_atgc_mj_WZ))
+                #add WW and WZ pdfs to get a single signal pdf
+                ##define relative coefficients for the RooAddPdf
+                ###for now, sideband is scaled with scaling factor from signal region
+                if True:#region == 'sig':
+                    rel_norm_atgc_WW        = RooFormulaVar(pdf_atgc_WW_2d.GetName()+'_relnorm',pdf_atgc_WW_2d.GetName()+'_relnorm','@0*@1/(@0*(@1+@2))',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
+                    rel_norm_atgc_WZ        = RooFormulaVar(pdf_atgc_WZ_2d.GetName()+'_relnorm',pdf_atgc_WZ_2d.GetName()+'_relnorm','@0*@2/(@0*(@1+@2))',RooArgList(self.WS2.function('normfactor_3d_%s_WZ'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
+                else:
+                    rel_norm_atgc_WW        = RooFormulaVar(pdf_atgc_WW_2d.GetName()+'_relnorm',pdf_atgc_WW_2d.GetName()+'_relnorm','@0/(@0+@1)',RooArgList(self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
+                    rel_norm_atgc_WZ        = RooFormulaVar(pdf_atgc_WZ_2d.GetName()+'_relnorm',pdf_atgc_WZ_2d.GetName()+'_relnorm','@1/(@0+@1)',RooArgList(self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
+                signal_2d_WWWZ      = RooAddPdf('ATGCPdf_WWWZ_%s_%s'%(region,self.ch),'ATGCPdf_WWWZ_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_WW_2d,pdf_atgc_WZ_2d),RooArgList(rel_norm_atgc_WW,rel_norm_atgc_WZ))
+                #final normalization
+                ##FIXME aTGC not scaled in sideband region? remove it?
+                signal_norm_WWWZ    = RooFormulaVar(signal_2d_WWWZ.GetName()+'_norm',signal_2d_WWWZ.GetName()+'_norm','@0*@2+@1*@3',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function('normfactor_3d_%s_WZ'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
+
+                self.Import_to_ws(self.WS2,[signal_2d_WWWZ,signal_norm_WWWZ],1)
+
+                #output        = TFile('%s/%s_%s_%s.root'%(path,sample,region,self.ch),'recreate')
+                output        = TFile('WWWZ_%s_%s_ws.root'%(region,self.ch),'recreate')
+                self.WS2.SetName('proc_WWWZ_%s_%s'%(region,self.ch))
+                self.WS2.Write();
+                #self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)).Write()
+                output.Close()
+                print 'Write to file ' + output.GetName()
 
 
-
-
-
-                for sample in ['WW','WZ']:
-                    sig_2d        = RooProdPdf('ATGCPdf_%s_%s_%s'%(sample,region,self.ch),'ATGCPdf_%s_%s_%s'%(sample,region,self.ch),RooArgList(self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)),w_bkg.pdf('m_j_%s_%s_pdf_%s'%(sample,region,self.ch))))
-                    if region == 'sig':
-                            norm_sig        = RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch)),self.WS2.function('normfactor_3d_%s_%s'%(self.ch,sample))))
-                    else:
-                        norm_sig        = RooFormulaVar(sig_2d.GetName()+'_norm',sig_2d.GetName()+'_norm','@0*1',RooArgList(self.WS2.function('%s_norm'%sample).clone('%s_norm_%s_%s'%(sample,region,self.ch))))
-                    self.Import_to_ws(self.WS2,[sig_2d,norm_sig],1)
-                
-                for sample in ['WW','WZ']:
-                        #output        = TFile('%s/%s_%s_%s.root'%(path,sample,region,self.ch),'recreate')
-                        output        = TFile('%s_%s_%s_ws.root'%(sample,region,self.ch),'recreate')
-                        self.WS2.SetName('proc_%s_%s_%s'%(sample,region,self.ch))
-                        self.WS2.Write();
-                        self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)).Write()
-                        output.Close()
-                        print 'Write to file ' + output.GetName()
-
-
-
-
-
-                ##create the datacard
-                self.Write_datacard()
+            ##create the datacards for all regions -> have to be combined with CombineCards.py
+            self.Write_datacard()
 
             #make some plots
             if options.Make_plots:
@@ -849,3 +867,9 @@ if __name__ == '__main__':
     else:
         makeWS        = Prepare_workspace_4limit(options.chan,900,3500)
         gmakeWS.Make_input()
+    #combine the created datacards
+    output_card_name = 'aC_WWWZ_simfit'
+    cmd = 'combineCards.py aC_WWWZ_sig_el.txt aC_WWWZ_sig_mu.txt aC_WWWZ_sb_lo_el.txt aC_WWWZ_sb_lo_mu.txt aC_WWWZ_sb_hi_el.txt aC_WWWZ_sb_hi_mu.txt > %s.txt'%output_card_name
+    print cmd
+    os.system(cmd)
+    print 'generated Card : %s.txt'%output_card_name
