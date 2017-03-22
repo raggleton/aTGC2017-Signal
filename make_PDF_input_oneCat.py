@@ -742,9 +742,9 @@ rate                        1\t"""
 
 
             #create a workspace for each component in each region
+            self.WS2 = self.WS.Clone("w")        #temporary 
+            set_mj        = RooArgSet(self.WS2.var('rrv_mass_j'))
             for region in self.regions:
-                self.WS2 = self.WS.Clone("w")        #temporary 
-                set_mj        = RooArgSet(self.WS2.var('rrv_mass_j'))
                 for bkg in self.bkgs:
                     #define global norm for whole mj spectrum
                     norm_var    = RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal(),0,1e4)
@@ -802,7 +802,11 @@ rate                        1\t"""
                 signal_2d_WWWZ      = RooAddPdf('ATGCPdf_WWWZ_%s_%s'%(region,self.ch),'ATGCPdf_WWWZ_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_WW_2d,pdf_atgc_WZ_2d),RooArgList(rel_norm_atgc_WW,rel_norm_atgc_WZ))
                 #final normalization
                 ##FIXME aTGC not scaled in sideband region? remove it?
-                signal_norm_WWWZ    = RooFormulaVar(signal_2d_WWWZ.GetName()+'_norm',signal_2d_WWWZ.GetName()+'_norm','@0*@2+@1*@3',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function('normfactor_3d_%s_WZ'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
+                WW_Int      = w_bkg.pdf('mj_WW_%s'%self.ch).createIntegral(set_mj,set_mj,region).getVal()
+                WZ_Int      = w_bkg.pdf('mj_WZ_%s'%self.ch).createIntegral(set_mj,set_mj,region).getVal()
+                WW_norm_reg = RooRealVar("WW_norm_%s"%region,"WW_norm_%s"%region,WW_Int*self.WS2.function('WW_norm').getVal())
+                WZ_norm_reg = RooRealVar("WZ_norm_%s"%region,"WZ_norm_%s"%region,WZ_Int*self.WS2.function('WZ_norm').getVal())
+                signal_norm_WWWZ    = RooFormulaVar(signal_2d_WWWZ.GetName()+'_norm',signal_2d_WWWZ.GetName()+'_norm','@0*@2+@1*@3',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function('normfactor_3d_%s_WZ'%self.ch),WW_norm_reg,WZ_norm_reg))
 
                 self.Import_to_ws(self.WS2,[signal_2d_WWWZ,signal_norm_WWWZ],1)
 
