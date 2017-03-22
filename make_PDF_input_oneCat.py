@@ -742,9 +742,9 @@ rate                        1\t"""
 
 
             #create a workspace for each component in each region
-            self.WS2 = self.WS.Clone("w")        #temporary 
-            set_mj        = RooArgSet(self.WS2.var('rrv_mass_j'))
             for region in self.regions:
+                self.WS2 = self.WS.Clone("w")        #temporary 
+                set_mj        = RooArgSet(self.WS2.var('rrv_mass_j'))
                 for bkg in self.bkgs:
                     #define global norm for whole mj spectrum
                     norm_var    = RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal(),0,1e4)
@@ -780,20 +780,21 @@ rate                        1\t"""
                 #
                 ##FIXME? signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible there
                 ##FIXME need only one pdf for WW and WZ
+                ##FIXME WZ scaling way too big
                 data_obs            = RooDataSet('data_obs','data_obs',w_bkg.data('dataset_2d_%s_%s'%(region,self.ch)),RooArgSet(self.WS2.var('rrv_mass_lvj'),self.WS2.var('mj_%s'%region)))
                 getattr(self.WS2,'import')(data_obs)
 
                 pdf_atgc_mlvj_WW    = self.WS2.pdf('aTGC_model_%s_WW'%self.ch)
                 pdf_atgc_mlvj_WZ    = self.WS2.pdf('aTGC_model_%s_WZ'%self.ch)
-                pdf_atgc_mj_WW      = w_bkg.pdf('m_j_WW_%s_pdf_%s'%(region,self.ch))
-                pdf_atgc_mj_WZ      = w_bkg.pdf('m_j_WZ_%s_pdf_%s'%(region,self.ch))
+                pdf_atgc_mj_WW      = w_bkg.pdf('WW_mj_%s_%s'%(region,self.ch))
+                pdf_atgc_mj_WZ      = w_bkg.pdf('WZ_mj_%s_%s'%(region,self.ch))
 
                 pdf_atgc_WW_2d  = RooProdPdf('ATGCPdf_WW_2d_%s_%s'%(region,self.ch),'ATGCPdf_WW_2d_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_mlvj_WW,pdf_atgc_mj_WW))
                 pdf_atgc_WZ_2d  = RooProdPdf('ATGCPdf_WZ_2d_%s_%s'%(region,self.ch),'ATGCPdf_WZ_2d_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_mlvj_WZ,pdf_atgc_mj_WZ))
                 #add WW and WZ pdfs to get a single signal pdf
                 ##define relative coefficients for the RooAddPdf
-                ###for now, sideband is scaled with scaling factor from signal region
-                if True:#region == 'sig':
+                ###for now, sideband is not scaled
+                if region == 'sig':
                     rel_norm_atgc_WW        = RooFormulaVar(pdf_atgc_WW_2d.GetName()+'_relnorm',pdf_atgc_WW_2d.GetName()+'_relnorm','@0*@1/(@0*(@1+@2))',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
                     rel_norm_atgc_WZ        = RooFormulaVar(pdf_atgc_WZ_2d.GetName()+'_relnorm',pdf_atgc_WZ_2d.GetName()+'_relnorm','@0*@2/(@0*(@1+@2))',RooArgList(self.WS2.function('normfactor_3d_%s_WZ'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
                 else:
