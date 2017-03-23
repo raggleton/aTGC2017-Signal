@@ -46,6 +46,7 @@ def plot(w,fitres,normset,spectrum,ch,region):
     bkg_pdfs["WWWZ"]    = RooExtendPdf("WWWZ","WWWZ",w.pdf("shapeSig_ATGCPdf_WWWZ_%s_%s_%s"%(region,ch,ch_num)),w.function("shapeSig_ATGCPdf_WWWZ_%s_%s_%s__norm"%(region,ch,ch_num)))
     bkg_norms["WWWZ"]   = w.function("shapeSig_ATGCPdf_WWWZ_%s_%s_%s__norm"%(region,ch,ch_num)).getVal()
 
+    cwwwtmp=w.var('cwww').getVal();ccwtmp=w.var('ccw').getVal();cbtmp=w.var('cb').getVal()
 
     model   = RooAddPdf("model","model",RooArgList(bkg_pdfs["WWWZ"],bkg_pdfs["TTbar"],bkg_pdfs["STop"],bkg_pdfs["WJets"]))
     model_norm  = float(bkg_norms["WJets"]+bkg_norms["STop"]+bkg_norms["TTbar"]+bkg_norms["WWWZ"])
@@ -60,7 +61,13 @@ def plot(w,fitres,normset,spectrum,ch,region):
         model.plotOn(p,RooFit.Name("TTbar"),RooFit.Components("WJets,STop,TTbar"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
         model.plotOn(p,RooFit.Name("STop"),RooFit.Components("WJets,STop"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(2))
         model.plotOn(p,RooFit.Name("WJets"),RooFit.Components("WJets"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(2))
+
+        w.var('cwww').setVal(0);w.var('ccw').setVal(0);w.var('cb').setVal(0);
+        model.plotOn(p,RooFit.Name("WWWZSM"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
+        w.var('cwww').setVal(cwwwtmp);w.var('ccw').setVal(ccwtmp);w.var('cb').setVal(cbtmp);
     elif spectrum == "mlvj":
+        model.plotOn(p,RooFit.Name("WWWZ"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kMagenta),RooFit.LineStyle(kDashed),RooFit.LineWidth(2))
+        w.var("cwww").setVal(0);w.var("ccw").setVal(0);w.var("cb").setVal(0);
         model.plotOn(p,RooFit.Name("WWWZ"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(kRed),RooFit.DrawOption("F"))
         model.plotOn(p,RooFit.Name("WJets"),RooFit.Components("STop,WJets,TTbar"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(kGreen),RooFit.DrawOption("F"))
         model.plotOn(p,RooFit.Name("TTbar"),RooFit.Components("STop,TTbar"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(kOrange),RooFit.DrawOption("F"))
@@ -70,7 +77,7 @@ def plot(w,fitres,normset,spectrum,ch,region):
         model.plotOn(p,RooFit.Name("TTbar"),RooFit.Components("STop,TTbar"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
         model.plotOn(p,RooFit.Name("WJets"),RooFit.Components("STop,WJets,TTbar"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
         model.plotOn(p,RooFit.Name("WWWZ"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
-
+    '''
     data_histo   = data.binnedClone("data","data").createHistogram("data",rrv_x,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num))
     data_plot    = RooHist(data_histo,100)
     data_plot.SetMarkerStyle(20)
@@ -88,9 +95,9 @@ def plot(w,fitres,normset,spectrum,ch,region):
         data_plot.SetPointEXlow(iPoint,0)
         data_plot.SetPointEXhigh(iPoint,0)
     data_plot.SetName('data')
-    p.addPlotable(data_plot,"PE")
+    p.addPlotable(data_plot,"PE")'''
 
-    #data.plotOn(p,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num),RooFit.Name("data"))
+    data.plotOn(p,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num),RooFit.Name("data"))
 
     return p
 
@@ -142,7 +149,7 @@ def plot_mlvj(w,ch='el',reg='sig'):
     pad1        = TPad('pad1','pad1',0.,0.25,1.,1.)
     pad_pull    = TPad('pad_pull','pad_pull',0.,0.02,1.,0.25)
     p=plot(w,fitres,normset,'mlvj',ch,reg)
-    p.GetYaxis().SetRangeUser(1e-2,2e2)
+    p.GetYaxis().SetRangeUser(1e-2,3e2)
 
     canvas.cd()
     pad1.Draw()
@@ -192,8 +199,8 @@ for i in range(fitparas.getSize()):
     string += fitparas.at(i).GetName() + ': ' + str(w.var(fitparas.at(i).GetName()).getVal()) + ' / ' + str(fitparas.at(i).getVal()) + '\n'
 
 
-#plot_mj(w,"mu")
-plot_mlvj(w,'mu','sig')
+plot_mj(w,"el")
+plot_mlvj(w,'el','sig')
 
 print string
 
