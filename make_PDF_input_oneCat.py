@@ -693,6 +693,17 @@ rate                        1\t"""
                                 card+="""\t\t\t\t{lnN_value}""".format(lnN_value=lnN_value[i][index])
                             else:
                                 card+="""\t\t\t\t-"""
+                card += '''
+normvar_WJets_{ch}  flatParam
+TTbar_gaus_constr_{ch} param 1 0.2
+rrv_c_ErfExp_WJets0_{ch}  flatParam
+rrv_n_ExpN_WJets0_sb_{ch}  flatParam
+rrv_c_ExpN_WJets0_sb_{ch}  flatParam
+Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig0 param 0.0 1.4
+Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig1 param 0.0 1.4
+Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig2 param 0.0 1.4
+Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig3 param 0.0 1.4
+slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
                 print card
                 cardfile = open('aC_%s.txt'%(codename),'w')
@@ -728,9 +739,6 @@ rate                        1\t"""
                 print  "rrv_number_%s_%s_mj"%(bkg,self.ch)
                 getattr(self.WS,'import')(w_bkg.var("rrv_number_mj_%s_%s"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
 
-            #set shape parameter in mj-WJets floating
-            w_bkg.var("rrv_c_ErfExp_WJets0_%s"%self.ch).setConstant(kFALSE)
-
             #import m_pruned and define ranges
             getattr(self.WS,'import')(w_bkg.var('rrv_mass_j'))
             self.WS.var('rrv_mass_j').setRange('sb_lo',40,65)
@@ -748,27 +756,21 @@ rate                        1\t"""
                 for bkg in self.bkgs:
                     #define global norm for whole mj spectrum
                     norm_var    = RooRealVar('normvar_%s_%s'%(bkg,self.ch),'normvar_%s_%s'%(bkg,self.ch),self.WS2.var("norm_%s_%s"%(bkg,self.ch)).getVal(),0,1e4)
+                    norm_var.setConstant(kTRUE)
                     #define integral over region
                     reg_Int     = w_bkg.pdf('mj_%s_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj, region)
-                    if bkg=='WJets':#norm floating for WJets, integral depends on (floating) shape parameter
-                        norm_var.setConstant(kFALSE)
+                    if bkg=='WJets':        #norm floating for WJets, integral depends on (floating) shape parameter
                         norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'@0*@1',RooArgList(reg_Int,norm_var))
+                    elif bkg=='TTbar':      #TTbar is floating with gaussian constraint, applied with additional variable
+                        TTbar_g_var = RooRealVar('TTbar_gaus_constr_%s'%self.ch,'TTbar_gaus_constr_%s'%self.ch,1,0,2)
+                        norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0*@1'%reg_Int.getVal(),RooArgList(norm_var,TTbar_g_var))
                     else:#norm and integral fixed for rest
-                        norm_var.setConstant(kTRUE)
                         norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
-                    if self.regions == 'sig':
+                    if region == 'sig':
                         bkg_MWV     = w_bkg.pdf('%s_mlvj_sig_%s'%(bkg,self.ch))
                     else:
                         #pdfs from the sb fit are fitted simultaneously in the lower and upper sb
                         bkg_MWV = w_bkg.pdf('%s_mlvj_sb_%s'%(bkg,self.ch)).clone('%s_mlvj_%s_%s'%(bkg,region,self.ch))
-                    #if bkg=='WJets' and 'sb' in region: #all shape parameters of the W+Jets pdf in sideband region floating ##FIXME should already be done in prepare_bkg_oneCat.py
-                    #    params_mlvj   = bkg_MWV.getParameters(self.WS2.data('dataset_mj_%s'%region))
-                    #    p_iter        = params_mlvj.createIterator()
-                    #    p_iter.Reset()
-                    #    param        = p_iter.Next()
-                    #    while param:
-                    #        param.setConstant(kFALSE)
-                    #        param        = p_iter.Next()
                     bkg_mj          = w_bkg.pdf('%s_mj_%s_%s'%(bkg,region,self.ch))
                     #make 2d pdf
                     bkg_2d_pdf      = RooProdPdf(bkg,bkg,RooArgList(bkg_MWV,bkg_mj))
@@ -777,9 +779,7 @@ rate                        1\t"""
                     self.Import_to_ws(self.WS2,[bkg_2d_pdf,norm],1)
 
                 #signal function for WW and WZ in signal region and lower/upper sideband
-                #
-                ##FIXME? signal function is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible there
-                ##FIXME need only one pdf for WW and WZ
+                ##FIXME? signal shape is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible there
                 ##FIXME WZ scaling way too big
                 data_obs            = RooDataSet('data_obs','data_obs',w_bkg.data('dataset_2d_%s_%s'%(region,self.ch)),RooArgSet(self.WS2.var('rrv_mass_lvj'),self.WS2.var('mj_%s'%region)))
                 getattr(self.WS2,'import')(data_obs)
@@ -793,8 +793,8 @@ rate                        1\t"""
                 pdf_atgc_WZ_2d  = RooProdPdf('ATGCPdf_WZ_2d_%s_%s'%(region,self.ch),'ATGCPdf_WZ_2d_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_mlvj_WZ,pdf_atgc_mj_WZ))
                 #add WW and WZ pdfs to get a single signal pdf
                 ##define relative coefficients for the RooAddPdf
-                ###for now, sideband is not scaled
-                if region == 'sig':
+                ###for now, sideband is scaled as signal region atm
+                if True:#region == 'sig':
                     rel_norm_atgc_WW        = RooFormulaVar(pdf_atgc_WW_2d.GetName()+'_relnorm',pdf_atgc_WW_2d.GetName()+'_relnorm','@0*@1/(@0*(@1+@2))',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
                     rel_norm_atgc_WZ        = RooFormulaVar(pdf_atgc_WZ_2d.GetName()+'_relnorm',pdf_atgc_WZ_2d.GetName()+'_relnorm','@0*@2/(@0*(@1+@2))',RooArgList(self.WS2.function('normfactor_3d_%s_WZ'%self.ch),self.WS2.function('WW_norm'),self.WS2.function('WZ_norm')))
                 else:
@@ -808,6 +808,18 @@ rate                        1\t"""
                 signal_norm_WWWZ    = RooFormulaVar(signal_2d_WWWZ.GetName()+'_norm',signal_2d_WWWZ.GetName()+'_norm','@0*@2+@1*@3',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function('normfactor_3d_%s_WZ'%self.ch),WW_tmp_norm,WZ_tmp_norm))
 
                 self.Import_to_ws(self.WS2,[signal_2d_WWWZ,signal_norm_WWWZ],1)
+
+                ##define which parameters are floating (also has to be done in the datacard)
+                self.WS2.var("rrv_c_ErfExp_WJets0_%s"%self.ch).setConstant(kFALSE)
+                self.WS2.var("normvar_WJets_%s"%self.ch).setConstant(kFALSE)
+                if 'sb' in region:
+                    self.WS2.var("rrv_c_ExpN_WJets0_sb_%s"%self.ch).setConstant(kFALSE)
+                    self.WS2.var("rrv_n_ExpN_WJets0_sb_%s"%self.ch).setConstant(kFALSE)
+                else:
+                    self.WS2.var("Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig0"%self.ch).setConstant(kTRUE)
+                    self.WS2.var("Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig1"%self.ch).setConstant(kTRUE)
+                    self.WS2.var("Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig2"%self.ch).setConstant(kTRUE)
+                    self.WS2.var("Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig3"%self.ch).setConstant(kTRUE)
 
                 #output        = TFile('%s/%s_%s_%s.root'%(path,sample,region,self.ch),'recreate')
                 output        = TFile('WWWZ_%s_%s_ws.root'%(region,self.ch),'recreate')
@@ -869,7 +881,7 @@ if __name__ == '__main__':
         makeWS_mu.Make_input()
     else:
         makeWS        = Prepare_workspace_4limit(options.chan,900,3500)
-        gmakeWS.Make_input()
+        makeWS.Make_input()
     #combine the created datacards
     output_card_name = 'aC_WWWZ_simfit'
     cmd = 'combineCards.py aC_WWWZ_sig_el.txt aC_WWWZ_sig_mu.txt aC_WWWZ_sb_lo_el.txt aC_WWWZ_sb_lo_mu.txt aC_WWWZ_sb_hi_el.txt aC_WWWZ_sb_hi_mu.txt > %s.txt'%output_card_name
