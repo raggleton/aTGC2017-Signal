@@ -17,7 +17,7 @@ from ROOT import RooErfExpPdf, RooErfPowExpPdf, RooErfPowPdf, RooErfPow2Pdf, Roo
 ch_nums = {"sig_el":"ch1","sb_lo_el":"ch3","sb_hi_el":"ch5","sig_mu":"ch2","sb_lo_mu":"ch4","sb_hi_mu":"ch6"}
 
 
-def plot(w,spectrum,ch,region):
+def plot(w,fitres,normset,spectrum,ch,region):
     
     if spectrum == "mj":
         rrv_x       = w.var("mj_%s"%region)
@@ -33,6 +33,10 @@ def plot(w,spectrum,ch,region):
     ch_num      = ch_nums[region+'_'+ch]
     bkgs        = ['WJets','TTbar','STop']
     data        = w.data("data_obs")
+
+    fitparas    = fitres.floatParsFinal()
+    for i in range(fitparas.getSize()):
+        w.var(fitparas.at(i).GetName()).setVal(fitparas.at(i).getVal())
 
     bkg_pdfs    = {}
     bkg_norms    = {}
@@ -67,7 +71,26 @@ def plot(w,spectrum,ch,region):
         model.plotOn(p,RooFit.Name("WJets"),RooFit.Components("STop,WJets,TTbar"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
         model.plotOn(p,RooFit.Name("WWWZ"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
 
-    data.plotOn(p,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num))
+    data_histo   = data.binnedClone("data","data").createHistogram("data",rrv_x,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num))
+    data_plot    = RooHist(data_histo,100)
+    data_plot.SetMarkerStyle(20)
+    data_plot.SetMarkerSize(1)
+    alpha        = 1-0.6827
+    for iPoint in range(data_plot.GetN()):
+        N = data_plot.GetY()[iPoint]
+        if N==0 :
+            L = 0
+        else:
+            L = Math.gamma_quantile(alpha/2.,N,1.)
+        U = Math.gamma_quantile_c(alpha/2,N+1,1.)
+        data_plot.SetPointEYlow(iPoint, N-L)
+        data_plot.SetPointEYhigh(iPoint, U-N)
+        data_plot.SetPointEXlow(iPoint,0)
+        data_plot.SetPointEXhigh(iPoint,0)
+    data_plot.SetName('data')
+    p.addPlotable(data_plot,"PE")
+
+    #data.plotOn(p,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num),RooFit.Name("data"))
 
     return p
 
@@ -79,7 +102,7 @@ def plot_mj(w,ch="el"):
     pad_sblo    = TPad("sblo","sblo",0,0,5/22.,1)
     pad_sblo.SetRightMargin(0)
     pad_sblo.cd()
-    p_sblo    = plot(w,'mj',ch,'sb_lo')
+    p_sblo    = plot(w,fitres,normset,'mj',ch,'sb_lo')
     p_sblo.GetXaxis().SetTitleSize(0)
     p_sblo.Draw()
     p_sblo.Print()
@@ -88,14 +111,14 @@ def plot_mj(w,ch="el"):
     pad_sig.SetRightMargin(0)
     pad_sig.SetLeftMargin(0)
     pad_sig.cd()
-    p_sig    = plot(w,'mj',ch,'sig')
+    p_sig    = plot(w,fitres,normset,'mj',ch,'sig')
     p_sig.GetXaxis().SetTitleSize(0)
     p_sig.Draw()
 
     pad_sbhi    = TPad("sbhi","sbhi",13/22.,0,1,1)
     pad_sbhi.SetLeftMargin(0)
     pad_sbhi.cd()
-    p_sbhi    = plot(w,'mj',ch,'sb_hi')
+    p_sbhi    = plot(w,fitres,normset,'mj',ch,'sb_hi')
     p_sbhi.Draw()
 
     canvas.cd()
@@ -105,7 +128,8 @@ def plot_mj(w,ch="el"):
 
     canvas.Draw()
     canvas.Update()
-    raw_input(1)
+
+    raw_input(',.,.,.')
 
     pad_sblo.Delete()
     pad_sig.Delete()
@@ -114,54 +138,64 @@ def plot_mj(w,ch="el"):
 def plot_mlvj(w,ch='el',reg='sig'):
 
     canvas = TCanvas(ch,ch,1)
-    p=plot(w,'mlvj',ch,reg)
-    p.GetYaxis().SetRangeUser(1e-2,2e2)
     canvas.SetLogy()
+    pad1        = TPad('pad1','pad1',0.,0.25,1.,1.)
+    pad_pull    = TPad('pad_pull','pad_pull',0.,0.02,1.,0.25)
+    p=plot(w,fitres,normset,'mlvj',ch,reg)
+    p.GetYaxis().SetRangeUser(1e-2,2e2)
+
+    canvas.cd()
+    pad1.Draw()
+    pad_pull.Draw()
+
+    pad1.cd()
+    pad1.SetLogy()
+    pad1.SetTicky()
     p.Draw()
-    canvas.Draw()
+    p.Print()
+
+    pad_pull.cd()
+    pullhist = p.pullHist('data','WWWZ')
+    ratio_style = TH1D('ratio_style','ratio_style',26,900,3500)
+    ratio_style.SetMarkerStyle(21)
+    ratio_style.SetMaximum(3)
+    ratio_style.SetMinimum(-3)
+    ratio_style.GetYaxis().SetNdivisions(7)
+    ratio_style.GetYaxis().SetTitle('#frac{MC-Fit}{error}')
+    ratio_style.GetYaxis().SetLabelSize(0.125)
+    ratio_style.GetYaxis().SetTitleSize(0.2)
+    ratio_style.GetYaxis().SetTitleOffset(0.2)
+    ratio_style.Draw("")
+    pullhist.SetLineColor(kBlue)
+    pullhist.Draw("SAME E1")
+
     canvas.Update()
     raw_input(ch)
 
-def check_mj_4consistency(w,ch):
-    bkgs    = ['WJets','TTbar','STop']
-    for bkg in bkgs:
-        paras_sets = []
-        for region in ['sb_lo','sig','sb_hi']:
-            ch_num      = ch_nums[region+'_'+ch]
-            pdf     = w.pdf("shapeBkg_%s_%s"%(bkg,ch_num))
-            paras   = pdf.getParameters(w.data("data_obs"))
-            paras_sets.append(paras)
-            
-        pIter1  = paras_sets[0].createIterator()
-        pIter2  = paras_sets[1].createIterator()
-        pIter3  = paras_sets[2].createIterator()
-        pnext1  = pIter1.Next()
-        pnext2  = pIter2.Next()
-        pnext3  = pIter3.Next()
-        fails = []
-        while pnext1:
-            if pnext1!=pnext2 or pnext1!=pnext3 or pnext2!=pnext3:
-                fails.append([pnext1,pnext2,pnext3])
-            pnext1 = pIter1.Next()
-            pnext2 = pIter2.Next()
-            pnext3 = pIter3.Next()
-        print "Parameters that are different in the " + bkg + "-Pdf:"
-        for i in fails:
-            for j in i:
-                j.Print()
-            print '-'
-        print '---'
-    raw_input('------')
+    pad1.Delete()
+    pad_pull.Delete()
 
 
 
-fileIn     = TFile.Open("workspace_simfit.root")
-w        = fileIn.Get("w")
+
+fileIn      = TFile.Open("workspace_simfit.root")
+w           = fileIn.Get("w")
 fileIn.Close()
-#plot_mj(w,"el")
+fileIn      = TFile.Open("mlfit4plot.root")
+fitres      = fileIn.Get("fit_s")
+normset     = fileIn.Get("norm_fit_s")
+fileIn.Close()
+
+fitparas    = fitres.floatParsFinal()
+string = 'name: pre-fit / post-fit \n'
+for i in range(fitparas.getSize()):
+    string += fitparas.at(i).GetName() + ': ' + str(w.var(fitparas.at(i).GetName()).getVal()) + ' / ' + str(fitparas.at(i).getVal()) + '\n'
+
+
 #plot_mj(w,"mu")
-#plot_mlvj(w,'el','sb_hi')
-check_mj_4consistency(w,'el')
-check_mj_4consistency(w,'mu')
+plot_mlvj(w,'mu','sig')
+
+print string
+
 
 
