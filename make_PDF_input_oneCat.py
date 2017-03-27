@@ -699,10 +699,10 @@ TTbar_gaus_constr_{ch} param 1 0.2
 rrv_c_ErfExp_WJets0_{ch}  flatParam
 rrv_n_ExpN_WJets0_sb_{ch}  flatParam
 rrv_c_ExpN_WJets0_sb_{ch}  flatParam
-Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig0 param 0.0 1.4
-Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig1 param 0.0 1.4
-Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig2 param 0.0 1.4
-Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig3 param 0.0 1.4
+Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig0 param 0.0 1.4
+Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig1 param 0.0 1.4
+Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig2 param 0.0 1.4
+Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig3 param 0.0 1.4
 slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
                 print card
