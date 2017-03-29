@@ -24,7 +24,6 @@ parser.add_option('-b', action='store_true', dest='batch', default=False, help='
 parser.add_option('-c', '--ch', dest='chan', default='elmu', help='channel, el, mu or elmu')
 parser.add_option('--noatgcint', action='store_true', dest='noatgcint', default=False, help='set atgc-interference coefficients to zero')
 parser.add_option('--printatgc', action='store_true', default=False, help='print atgc-interference contribution')
-parser.add_option('--yieldplots', action='store_true', default=False, help='make plots of relative yields')
 parser.add_option('--atgc', action='store_true', dest='atgc', default=False, help='use anomalous coupling parametrization instead of EFT')
 parser.add_option("--config",dest="config",default='config_simfit',help="The name of the input configuration file.")
 
@@ -107,9 +106,14 @@ class Prepare_workspace_4limit:
                     hists4scale['c_pos_%s_hist_%s'%(WV,para)] = TH1F('c_pos_%s_hist_%s'%(WV,para),'c_pos_%s_hist_%s'%(WV,para),self.nbins,self.binlo,self.binhi);
                     hists4scale['c_neg_%s_hist_%s'%(WV,para)] = TH1F('c_neg_%s_hist_%s'%(WV,para),'c_neg_%s_hist_%s'%(WV,para),self.nbins,self.binlo,self.binhi);
                     hists4scale['c_dif_%s_hist_%s'%(WV,para)] = TH1F('c_dif_%s_hist_%s'%(WV,para),'dif_%s_hist_%s'%(WV,para),self.nbins,self.binlo,self.binhi);
+                    hists4scale['c_pos_%s_hist_%s'%(WV,para)].Sumw2(kTRUE)
+                    hists4scale['c_neg_%s_hist_%s'%(WV,para)].Sumw2(kTRUE)
+                    hists4scale['c_dif_%s_hist_%s'%(WV,para)].Sumw2(kTRUE)
                 #add histograms for SM and all aTGC parameters unequal to zero
                 hists4scale['c_SM_%s_hist'%WV]                  = TH1F('c_SM_%s_hist'%WV,'c_SM_%s_hist'%WV,self.nbins,self.binlo,self.binhi);                
                 hists4scale['c_%s_histall3'%WV]                 = TH1F('c_%s_histall3'%WV,'c_%s_histall3'%WV,self.nbins,self.binlo,self.binhi);
+                hists4scale['c_SM_%s_hist'%WV].Sumw2(kTRUE)
+                hists4scale['c_%s_histall3'%WV].Sumw2(kTRUE)
 
                 print 'reading %s-aTGC_%s.root'%(WV,self.ch)
                 fileInATGC        = TFile.Open('Input/%s-aTGC_%s.root'%(WV,self.ch))
