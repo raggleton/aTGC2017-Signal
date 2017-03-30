@@ -551,58 +551,10 @@ class Prepare_workspace_4limit:
                 
             for i in range(3):
                 self.wtmp.var(self.POI[i]).setVal(0)
-            
+
             if options.atgc:
                 #go from EFT parametrization to Lagrangian approach, taken from SI-HEP-2011-17
-        
-                Z_mass          = 0.0911876
-                W_mass          = 0.080385
-                G_F             = 11.663787
-                g_weak          = math.sqrt((8*G_F*W_mass**2)/(math.sqrt(2)))
-                theta_W         = math.acos(W_mass/Z_mass)
-                tan_theta_W     = math.tan(theta_W)
-                sin_theta_W     = math.sin(theta_W)
-
-                coeff_cb1       = RooRealVar('coeff_cb1','coeff_cb1',2/(tan_theta_W*tan_theta_W*Z_mass*Z_mass))
-                coeff_cb2       = RooRealVar('coeff_cb2','coeff_cb2',2/(sin_theta_W*sin_theta_W*Z_mass*Z_mass))
-                coeff_ccw       = RooRealVar('coeff_ccw','coeff_ccw',2/(Z_mass*Z_mass))
-                coeff_cwww      = RooRealVar('coeff_cwww','coeff_cwww',2/(3*g_weak*g_weak*W_mass*W_mass))
-
-                dg1z            = RooRealVar('dg1z','dg1z',0,-1,1)
-                lZ              = RooRealVar('lZ','lZ',0,-1,1)
-                dkz             = RooRealVar('dkz','dkz',0,-1,1)
-                dg1z.setConstant(kTRUE)
-                lZ.setConstant(kTRUE)
-                dkz.setConstant(kTRUE)
-
-                cwww            = RooFormulaVar('cwww_atgc','cwww_atgc','@0*@1',RooArgList(lZ,coeff_cwww))
-                ccw             = RooFormulaVar('ccw_atgc','ccw_atgc','@0*@1',RooArgList(dg1z,coeff_ccw))
-                cb              = RooFormulaVar('cb_atgc','cb_atgc','@0*@1-@2*@3',RooArgList(dg1z,coeff_cb1,dkz,coeff_cb2))
-                atgc_pars       = RooArgList(cwww,ccw,cb)
-                N_list_atgc     = RooArgList()
-                scale_list_atgc = RooArgList()
-
-                for i in range(8):
-                        customize_N        = RooCustomizer(N_list.at(i),'customize_N')
-                        for j in range(3):
-                                customize_N.replaceArg(self.wtmp.var(self.POI[j]),atgc_pars.at(j))
-                        N_list_atgc.add(customize_N.build())
-                        N_list_atgc.at(i).SetName(N_list.at(i).GetName())
-                model_atgc        = RooAddPdf('aTGC_model_%s'%channel,'aTGC_model_%s'%channel, Pdf_list, N_list_atgc)
-                for i in range(3):
-                        customize_scale        = RooCustomizer(scale_list.at(i),'customize_scale')
-                        for j in range(3):
-                                customize_scale.replaceArg(self.wtmp.var(self.POI[j]),atgc_pars.at(j))
-                        scale_list_atgc.add(customize_scale.build())
-                        
-                normfactor_3d        = RooFormulaVar('normfactor_3d_%s'%channel,'normfactor_3d_%s'%channel,'1+@0+@1+@2',scale_list_atgc)
-        
-                getattr(self.wtmp,'import')(model_atgc)
-                getattr(self.WS,'import')(model_atgc)
-                getattr(self.wtmp,'import')(normfactor_3d,RooFit.RecycleConflictNodes())
-                getattr(self.WS,'import')(normfactor_3d,RooFit.RecycleConflictNodes())
-                self.WS.Print()
-                raw_input(channel)
+                Transform2Lagrangian(N_list,Pdf_list,scale_list)
             else:
                 model.Print()
                 self.Import_to_ws(self.wtmp,[normfactor_3d,model])
@@ -641,7 +593,7 @@ class Prepare_workspace_4limit:
                 uncert_map['CMS_scale_met']                 = [1.006,1.005  ,'-'    ,1.005  ,1.012  ,1.002  ,1.003  ,'-'    ,1.001  ,1.005]
                 uncert_map['CMS_eff_e']                     = [1.001,1.001  ,'-'    ,1.001  ,1.001  ,'-'    ,'-'    ,'-'    ,'-'    ,'-'  ]
                 uncert_map['CMS_eff_m']                     = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.039  ,1.038  ,'-'    ,1.032  ,1.036]
-                ##FIXME jet energy scale? effects of up/down in different regions? ignored for now
+                ##FIXME jet energy scale? effects of up/down in different regions? ignored atm
                 uncert_map['CMS_scale_j']                   = [1.024,1.017  ,'-'    ,1.028  ,1.016  ,1.023  ,1.016  ,'-'    ,1.026  ,1.006  ]
                 regions                                     = ['sb_lo_el','sig_el','sb_hi_el','sb_lo_mu','sig_mu','sb_hi_mu']
                 bkgs                                        = ['WW','WZ','TTbar','STop']
@@ -693,6 +645,58 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                 cardfile.write(card)
                 cardfile.close()
                     #cardfilenames.append('aC_%s.txt'%(codename))
+
+
+        def Transform2lagrangian(N_list,Pdf_list,scale_list):
+            #go from EFT parametrization to Lagrangian approach, taken from SI-HEP-2011-17
+            Z_mass          = 0.0911876
+            W_mass          = 0.080385
+            G_F             = 11.663787
+            g_weak          = math.sqrt((8*G_F*W_mass**2)/(math.sqrt(2)))
+            theta_W         = math.acos(W_mass/Z_mass)
+            tan_theta_W     = math.tan(theta_W)
+            sin_theta_W     = math.sin(theta_W)
+
+            coeff_cb1       = RooRealVar('coeff_cb1','coeff_cb1',2/(tan_theta_W*tan_theta_W*Z_mass*Z_mass))
+            coeff_cb2       = RooRealVar('coeff_cb2','coeff_cb2',2/(sin_theta_W*sin_theta_W*Z_mass*Z_mass))
+            coeff_ccw       = RooRealVar('coeff_ccw','coeff_ccw',2/(Z_mass*Z_mass))
+            coeff_cwww      = RooRealVar('coeff_cwww','coeff_cwww',2/(3*g_weak*g_weak*W_mass*W_mass))
+
+            dg1z            = RooRealVar('dg1z','dg1z',0,-1,1)
+            lZ              = RooRealVar('lZ','lZ',0,-1,1)
+            dkz             = RooRealVar('dkz','dkz',0,-1,1)
+            dg1z.setConstant(kTRUE)
+            lZ.setConstant(kTRUE)
+            dkz.setConstant(kTRUE)
+
+            cwww            = RooFormulaVar('cwww_atgc','cwww_atgc','@0*@1',RooArgList(lZ,coeff_cwww))
+            ccw             = RooFormulaVar('ccw_atgc','ccw_atgc','@0*@1',RooArgList(dg1z,coeff_ccw))
+            cb              = RooFormulaVar('cb_atgc','cb_atgc','@0*@1-@2*@3',RooArgList(dg1z,coeff_cb1,dkz,coeff_cb2))
+            atgc_pars       = RooArgList(cwww,ccw,cb)
+            N_list_atgc     = RooArgList()
+            scale_list_atgc = RooArgList()
+
+            for i in range(8):
+                    customize_N        = RooCustomizer(N_list.at(i),'customize_N')
+                    for j in range(3):
+                            customize_N.replaceArg(self.wtmp.var(self.POI[j]),atgc_pars.at(j))
+                    N_list_atgc.add(customize_N.build())
+                    N_list_atgc.at(i).SetName(N_list.at(i).GetName())
+            model_atgc        = RooAddPdf('aTGC_model_%s'%channel,'aTGC_model_%s'%channel, Pdf_list, N_list_atgc)
+            for i in range(3):
+                    customize_scale        = RooCustomizer(scale_list.at(i),'customize_scale')
+                    for j in range(3):
+                            customize_scale.replaceArg(self.wtmp.var(self.POI[j]),atgc_pars.at(j))
+                    scale_list_atgc.add(customize_scale.build())
+                    
+            normfactor_3d        = RooFormulaVar('normfactor_3d_%s'%channel,'normfactor_3d_%s'%channel,'1+@0+@1+@2',scale_list_atgc)
+    
+            getattr(self.wtmp,'import')(model_atgc)
+            getattr(self.WS,'import')(model_atgc)
+            getattr(self.wtmp,'import')(normfactor_3d,RooFit.RecycleConflictNodes())
+            getattr(self.WS,'import')(normfactor_3d,RooFit.RecycleConflictNodes())
+            self.WS.Print()
+            raw_input(channel)
 
 
         ########################
@@ -766,20 +770,15 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                 data_obs            = RooDataSet('data_obs','data_obs',w_bkg.data('dataset_2d_%s_%s'%(region,self.ch)),RooArgSet(self.WS2.var('rrv_mass_lvj'),self.WS2.var('mj_%s'%region)))
                 getattr(self.WS2,'import')(data_obs)
 
-                pdf_atgc_mlvj_WW    = self.WS2.pdf('aTGC_model_%s_WW'%self.ch)
-                pdf_atgc_mlvj_WZ    = self.WS2.pdf('aTGC_model_%s_WZ'%self.ch)
-                pdf_atgc_mj_WW      = w_bkg.pdf('WW_mj_%s_%s'%(region,self.ch))
-                pdf_atgc_mj_WZ      = w_bkg.pdf('WZ_mj_%s_%s'%(region,self.ch))
-
-                pdf_atgc_WW_2d  = RooProdPdf('aTGC_WW_%s_%s'%(region,self.ch),'aTGC_WW_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_mlvj_WW,pdf_atgc_mj_WW))
-                pdf_atgc_WZ_2d  = RooProdPdf('aTGC_WZ_%s_%s'%(region,self.ch),'aTGC_WZ_%s_%s'%(region,self.ch),RooArgList(pdf_atgc_mlvj_WZ,pdf_atgc_mj_WZ))
-                ###for now, sideband is scaled as signal region
-                #final normalization
-                ##FIXME aTGC in sideband region scaled like signal region
-                signal_norm_WW    = RooFormulaVar(pdf_atgc_WW_2d.GetName()+'_norm',pdf_atgc_WW_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('normfactor_3d_%s_WW'%self.ch),self.WS2.function("WW_norm")))
-                signal_norm_WZ    = RooFormulaVar(pdf_atgc_WZ_2d.GetName()+'_norm',pdf_atgc_WZ_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('normfactor_3d_%s_WZ'%self.ch),self.WS2.function("WZ_norm")))
-
-                self.Import_to_ws(self.WS2,[pdf_atgc_WW_2d,pdf_atgc_WZ_2d,signal_norm_WW,signal_norm_WZ],1)
+                for VV in ['WW','WZ']:
+                    pdf_atgc_mlvj_VV    = self.WS2.pdf('aTGC_model_%s_%s'(%self.ch,VV))
+                    pdf_atgc_mj_VV      = w_bkg.pdf('%s_mj_%s_%s'%(VV,region,self.ch))
+                    pdf_atgc_VV_2d  = RooProdPdf('aTGC_%s_%s_%s'%(VV,region,self.ch),'aTGC_%s_%s_%s'%(VV,region,self.ch),RooArgList(pdf_atgc_mlvj_VV,pdf_atgc_mj_VV))
+                    ###for now, sideband is scaled as signal region
+                    #final normalization
+                    ##FIXME aTGC in sideband region scaled like signal region
+                    signal_norm_VV    = RooFormulaVar(pdf_atgc_VV_2d.GetName()+'_norm',pdf_atgc_VV_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('normfactor_3d_%s_%s'%(self.ch,VV)),self.WS2.function("norm_%s_%s"%(VV,self.ch))))
+                    self.Import_to_ws(self.WS2,[pdf_atgc_VV_2d,signal_norm_VV],1)
 
                 ##define which parameters are floating (also has to be done in the datacard)
                 self.WS2.var("rrv_c_ErfExp_WJets0_%s"%self.ch).setConstant(kFALSE)
