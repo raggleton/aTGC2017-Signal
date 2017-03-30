@@ -366,6 +366,13 @@ class Prepare_workspace_4limit:
                 pos_datahist    = RooDataHist('pos_datahist_%s_%s'%(sample,self.POI[i]),'pos_datahist_%s_%s'%(sample,self.POI[i]),RooArgList(rrv_x),fileInHist.Get('c_pos_%s_hist_%s'%(sample,self.POI[i])))
                 neg_datahist    = RooDataHist('neg_datahist_%s_%s'%(sample,self.POI[i]),'neg_datahist_%s_%s'%(sample,self.POI[i]),RooArgList(rrv_x),fileInHist.Get('c_neg_%s_hist_%s'%(sample,self.POI[i])))
                 dif_datahist    = RooDataHist('dif_datahist_%s_%s'%(sample,self.POI[i]),'dif_datahist_%s_%s'%(sample,self.POI[i]),RooArgList(rrv_x),fileInHist.Get('c_dif_%s_hist_%s'%(sample,self.POI[i])))
+
+                SMWW        = RooDataHist('SMWW_4scale','SMWW_4scale',RooArgList(rrv_x),fileInHist.Get('c_SM_WW_hist'))
+                posWW       = RooDataHist('posWW_4scale_%s'%self.POI[i],'posWW_4scale_%s'%self.POI[i],RooArgList(rrv_x),fileInHist.Get('c_pos_WW_hist_%s'%self.POI[i]))
+                negWW       = RooDataHist('negWW_4scale_%s'%self.POI[i],'negWW_4scale_%s'%self.POI[i],RooArgList(rrv_x),fileInHist.Get('c_neg_WW_hist_%s'%self.POI[i]))
+                SMWZ        = RooDataHist('SMWZ_4scale','SMWZ_4scale',RooArgList(rrv_x),fileInHist.Get('c_SM_WZ_hist'))
+                posWZ       = RooDataHist('posWZ_4scale_%s'%self.POI[i],'posWZ_4scale_%s'%self.POI[i],RooArgList(rrv_x),fileInHist.Get('c_pos_WZ_hist_%s'%self.POI[i]))
+                negWZ       = RooDataHist('negWZ_4scale_%s'%self.POI[i],'negWZ_4scale_%s'%self.POI[i],RooArgList(rrv_x),fileInHist.Get('c_neg_WZ_hist_%s'%self.POI[i]))
                 fileInHist.Close()
                 
                 #import datasets to wtmp and final workspace WS
@@ -374,9 +381,9 @@ class Prepare_workspace_4limit:
                 
                 #get scaling parabel from yields
                 hist4scale = TH1F('hist4scale_%s'%self.POI[i],'hist4scale_%s'%self.POI[i],3,-1.5*self.PAR_MAX[self.POI[i]],1.5*self.PAR_MAX[self.POI[i]])
-                hist4scale.SetBinContent(1,neg_datahist.sumEntries()/SMdatahist.sumEntries())
+                hist4scale.SetBinContent(1,(negWW.sumEntries()+negWZ.sumEntries())/(SMWW.sumEntries()+SMWZ.sumEntries()))
                 hist4scale.SetBinContent(2,1)
-                hist4scale.SetBinContent(3,pos_datahist.sumEntries()/SMdatahist.sumEntries())
+                hist4scale.SetBinContent(3,(posWW.sumEntries()+posWZ.sumEntries())/(SMWW.sumEntries()+SMWZ.sumEntries()))
                 #fit parabel
                 hist4scale.Fit('pol2','0')
                 fitfunc     = hist4scale.GetFunction('pol2')
@@ -453,6 +460,7 @@ class Prepare_workspace_4limit:
             if options.noatgcint:
                 cf = 0
             else:
+                #scaling factor for generator level -> reconstruction level
                 cf = datahist_all3.sumEntries() / N_4norm
 
             #get other coefficients
@@ -638,6 +646,10 @@ Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig0 param 0.0 1.4
 Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig1 param 0.0 1.4
 Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig2 param 0.0 1.4
 Deco_WJets0_sim_{ch}_HPV_mlvj_13TeV_eig3 param 0.0 1.4
+Deco_TTbar_sb_{ch}_HPV_mlvj_13TeV_eig0 param 0.0 2.0
+Deco_TTbar_sb_{ch}_HPV_mlvj_13TeV_eig1 param 0.0 2.0
+Deco_TTbar_sig_{ch}_HPV_mlvj_13TeV_eig0 param 0.0 2.0
+Deco_TTbar_sig_{ch}_HPV_mlvj_13TeV_eig1 param 0.0 2.0
 slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
                 print card
@@ -771,13 +783,14 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                 getattr(self.WS2,'import')(data_obs)
 
                 for VV in ['WW','WZ']:
-                    pdf_atgc_mlvj_VV    = self.WS2.pdf('aTGC_model_%s_%s'(%self.ch,VV))
+                    pdf_atgc_mlvj_VV    = self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,VV))
                     pdf_atgc_mj_VV      = w_bkg.pdf('%s_mj_%s_%s'%(VV,region,self.ch))
-                    pdf_atgc_VV_2d  = RooProdPdf('aTGC_%s_%s_%s'%(VV,region,self.ch),'aTGC_%s_%s_%s'%(VV,region,self.ch),RooArgList(pdf_atgc_mlvj_VV,pdf_atgc_mj_VV))
+                    pdf_atgc_VV_2d      = RooProdPdf('aTGC_%s_%s_%s'%(VV,region,self.ch),'aTGC_%s_%s_%s'%(VV,region,self.ch),RooArgList(pdf_atgc_mlvj_VV,pdf_atgc_mj_VV))
                     ###for now, sideband is scaled as signal region
                     #final normalization
                     ##FIXME aTGC in sideband region scaled like signal region
-                    signal_norm_VV    = RooFormulaVar(pdf_atgc_VV_2d.GetName()+'_norm',pdf_atgc_VV_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('normfactor_3d_%s_%s'%(self.ch,VV)),self.WS2.function("norm_%s_%s"%(VV,self.ch))))
+                    norm_VV_reg         =self.WS2.function("%s_norm"%VV).Clone("%s_norm_%s"%(VV,region))
+                    signal_norm_VV      = RooFormulaVar(pdf_atgc_VV_2d.GetName()+'_norm',pdf_atgc_VV_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('normfactor_3d_%s_%s'%(self.ch,VV)),norm_VV_reg))
                     self.Import_to_ws(self.WS2,[pdf_atgc_VV_2d,signal_norm_VV],1)
 
                 ##define which parameters are floating (also has to be done in the datacard)
