@@ -244,7 +244,7 @@ fileIn.Close()
 
 fitparas    = fitres.floatParsFinal()
 
-plot_all(w,options.ch,'prefit_%s.png'%options.ch)
+#plot_all(w,options.ch,'prefit_%s.png'%options.ch)
 
 string = '{:>40} : {:>18} / {:>15} \n'.format('>>name<<','>>pre-fit<<','>>post-fit<<')
 for i in range(fitparas.getSize()):
