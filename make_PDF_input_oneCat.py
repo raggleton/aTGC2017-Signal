@@ -579,7 +579,7 @@ class Prepare_workspace_4limit:
                 print N_list.at(i).GetName() + ' : ' + str(N_list.at(i).getVal())
 
 
-        def Write_datacard(self):
+        def Write_datacard(self,w):
             ### make the card for this channel and plane ID
 
             for region in self.regions:
@@ -597,16 +597,14 @@ class Prepare_workspace_4limit:
                 uncert_map['CMS_scale_m']                   = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.017  ,1.014  ,'-'    ,1.016  ,1.019]
                 uncert_map['pdf_qqbar']                     = [1.019,1.025  ,'-'    ,1.025  ,1.003  ,1.018  ,1.023  ,'-'    ,1.026  ,1.004]
                 uncert_map['QCD_scale_VV']                  = [1.060,1.060  ,'-'    ,'-'    ,'-'    ,1.060  ,1.060  ,'-'    ,'-'    ,'-'  ]
-                uncert_map['QCD_scale_TTbar']               = ['-'  ,'-'    ,'-'    ,1.019  ,1.020  ,'-'    ,'-'    ,'-'    ,1.019  ,1.019]
+                uncert_map['QCD_scale_TTbar']               = ['-'  ,'-'    ,'-'    ,1.190  ,1.020  ,'-'    ,'-'    ,'-'    ,1.190  ,1.019]
                 uncert_map['CMS_scale_met']                 = [1.006,1.005  ,'-'    ,1.005  ,1.012  ,1.002  ,1.003  ,'-'    ,1.001  ,1.005]
                 uncert_map['CMS_eff_e']                     = [1.001,1.001  ,'-'    ,1.001  ,1.001  ,'-'    ,'-'    ,'-'    ,'-'    ,'-'  ]
                 uncert_map['CMS_eff_m']                     = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.039  ,1.038  ,'-'    ,1.032  ,1.036]
                 ##FIXME jet energy scale? effects of up/down in different regions? ignored atm
                 uncert_map['CMS_scale_j']                   = [1.024,1.017  ,'-'    ,1.028  ,1.016  ,1.023  ,1.016  ,'-'    ,1.026  ,1.006  ]
-                regions                                     = ['sb_lo_el','sig_el','sb_hi_el','sb_lo_mu','sig_mu','sb_hi_mu']
                 bkgs                                        = ['WW','WZ','TTbar','STop']
                 NlnN    = len(uncert_map)
-
 
                 card = """\nimax 1  number of channels\njmax {Nbkg_int}  number of backgrounds\nkmax *  number of nuisance parameters (sources of systematical uncertainties)\n-------------""".format(Nbkg_int=Nbkg_int+1)
                 for i in range(0,Nbkg_int):
@@ -614,7 +612,7 @@ class Prepare_workspace_4limit:
                 card += """\nshapes data_obs\t\t\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename)    
                 card += """\nshapes aTGC_WW_{region}_{channel}\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,region=region,channel=self.ch)
                 card += """\nshapes aTGC_WZ_{region}_{channel}\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,region=region,channel=self.ch)
-                card += """\n------------\nbin\t\t\t{codename}\nobservation -1\n------------\nbin\t\t\t{codename}\t\t""".format(codename=codename)
+                card += """\n------------\nbin\t\t\t{codename}\nobservation {obs}\n------------\nbin\t\t\t{codename}\t\t""".format(codename=codename,obs=w.data('dataset_2d_%s_%s'%(region,self.ch)).sumEntries())
                 for i in range(0,Nbkg_int+1):
                     card += """\t\t{codename}""".format(codename=codename)
                 card += """\nprocess\t\taTGC_WW_{region}_{channel}    """.format(region=region,channel=self.ch)
@@ -638,7 +636,7 @@ class Prepare_workspace_4limit:
                 
                 card += '''
 normvar_WJets_{ch}  flatParam
-TTbar_gaus_constr_{ch} param 1 0.2
+TTbar_gaus_constr_{ch} param 1.0 0.2
 rrv_c_ErfExp_WJets0_{ch}  flatParam
 rrv_n_ExpN_WJets0_sb_{ch}  flatParam
 rrv_c_ExpN_WJets0_sb_{ch}  flatParam
@@ -656,7 +654,6 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                 cardfile = open('aC_%s.txt'%(codename),'w')
                 cardfile.write(card)
                 cardfile.close()
-                    #cardfilenames.append('aC_%s.txt'%(codename))
 
 
         def Transform2lagrangian(N_list,Pdf_list,scale_list):
@@ -736,7 +733,7 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
             for bkg in ['WJets','TTbar','STop','WW','WZ']:
                 print  "rrv_number_%s_%s_mj"%(bkg,self.ch)
-                getattr(self.WS,'import')(w_bkg.var("rrv_number_mj_%s_%s"%(bkg,self.ch)).clone('norm_%s_%s'%(bkg,self.ch)))
+                getattr(self.WS,'import')(w_bkg.var('norm_%s_%s'%(bkg,self.ch)))
 
             #import m_pruned and define ranges
             getattr(self.WS,'import')(w_bkg.var('rrv_mass_j'))
@@ -789,7 +786,7 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                     ###for now, sideband is scaled as signal region
                     #final normalization
                     ##FIXME aTGC in sideband region scaled like signal region
-                    norm_VV_reg         =self.WS2.function("%s_norm"%VV).Clone("%s_norm_%s"%(VV,region))
+                    norm_VV_reg         =self.WS2.function("%s_norm"%VV).Clone("%s_norm_%s_%s"%(VV,region,self.ch))
                     signal_norm_VV      = RooFormulaVar(pdf_atgc_VV_2d.GetName()+'_norm',pdf_atgc_VV_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('normfactor_3d_%s_%s'%(self.ch,VV)),norm_VV_reg))
                     self.Import_to_ws(self.WS2,[pdf_atgc_VV_2d,signal_norm_VV],1)
 
@@ -815,7 +812,7 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
 
             ##create the datacards for all regions -> have to be combined with CombineCards.py
-            self.Write_datacard()
+            self.Write_datacard(w_bkg)
 
             #make some plots
             if options.Make_plots:
