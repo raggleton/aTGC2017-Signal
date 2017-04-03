@@ -77,13 +77,8 @@ def plot(w,fitres,normset,spectrum,ch,region):
         model.plotOn(p,RooFit.Name("STop_line"),RooFit.Components("WJets,STop"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(2))
         model.plotOn(p,RooFit.Name("WJets_line"),RooFit.Components("WJets"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(2))
 
-        #w.var('cwww').setVal(0);w.var('ccw').setVal(0);w.var('cb').setVal(0);
-        #model_norm_tmp = float(bkg_norms["WJets"].getVal()+bkg_norms["STop"].getVal()+bkg_norms["TTbar"].getVal()+bkg_norms["WWWZ"].getVal())
-        #model.plotOn(p,RooFit.Name("WWWZSM"),RooFit.Normalization(model_norm_tmp,RooAbsReal.NumEvent),RooFit.LineColor(kCyan),RooFit.LineWidth(1))
-        #w.var('cwww').setVal(cwwwtmp);w.var('ccw').setVal(ccwtmp);w.var('cb').setVal(cbtmp);
     elif spectrum == "mlvj":
         model.plotOn(p,RooFit.Name("WWWZ_atgc"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["atgc"]),RooFit.FillStyle(3344),RooFit.DrawOption("F"))
-
 
         w.var("cwww").setVal(0);w.var("ccw").setVal(0);w.var("cb").setVal(0);
         model_norm_tmp = float(bkg_norms["WJets"].getVal()+bkg_norms["STop"].getVal()+bkg_norms["TTbar"].getVal()+bkg_norms["WW"].getVal()+bkg_norms["WZ"].getVal())
@@ -99,15 +94,11 @@ def plot(w,fitres,normset,spectrum,ch,region):
 
         model.plotOn(p,RooFit.Name("STop"),RooFit.Components("STop"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["STop"]),RooFit.DrawOption("F"))
         model.plotOn(p,RooFit.Name("STop_line"),RooFit.Components("STop"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
-        
 
 
-    
     data_histo   = data.binnedClone("data","data").createHistogram("data",rrv_x,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num))
     data_histo.Print()
     data_plot    = RooHist(data_histo,rrv_x.getBinWidth(0))
-    data_plot.Print()
-    #raw_input(1)
     data_plot.SetMarkerStyle(20)
     data_plot.SetMarkerSize(1)
     alpha        = 1-0.6827
@@ -246,9 +237,15 @@ fitparas    = fitres.floatParsFinal()
 
 #plot_all(w,options.ch,'prefit_%s.png'%options.ch)
 
-string = '{:>40} : {:>18} / {:>15} \n'.format('>>name<<','>>pre-fit<<','>>post-fit<<')
+string = '{:>40} : {:>18} / {:>18} / {:>15} \n'.format('>>name<<','>>pre-fit<<','>>post-fit<<','>>scalefactor<<')
 for i in range(fitparas.getSize()):
-    string += '{:>40} : {:>18} / {:>15} \n'.format(fitparas.at(i).GetName(),w.var(fitparas.at(i).GetName()).getVal(),fitparas.at(i).getVal())
+    prefit  = w.var(fitparas.at(i).GetName()).getVal()
+    postfit = round(fitparas.at(i).getVal(),4)
+    if prefit!=0:
+        ratio = postfit/prefit
+    else:
+        ratio = 1+postfit
+    string += '{:>40} : {:>18} / {:>18} / {:>15}\n'.format(fitparas.at(i).GetName(),prefit,postfit,round(ratio,2))
 for i in range(fitparas.getSize()):
     w.var(fitparas.at(i).GetName()).setVal(fitparas.at(i).getVal())
 
