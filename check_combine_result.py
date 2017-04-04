@@ -19,6 +19,7 @@ mj_bins = {"sb_lo":5,"sig":8,"sb_hi":9}
 
 parser        = OptionParser()
 parser.add_option('-c', '--ch', dest='ch', default='el', help='channel, el or mu')
+parser.add_option('-P','--POI', dest='poi', default='cwww:0')
 (options,args) = parser.parse_args()
 gStyle.SetOptStat(0)
 gStyle.SetOptTitle(0)
@@ -53,13 +54,17 @@ def plot(w,fitres,normset,spectrum,ch,region):
     bkg_pdfs["WZ"]    = RooExtendPdf("WZ","WZ",w.pdf("shapeSig_aTGC_WZ_%s_%s_%s"%(region,ch,ch_num)),w.function("shapeSig_aTGC_WZ_%s_%s_%s__norm"%(region,ch,ch_num)))
     bkg_norms["WZ"]   = w.function("shapeSig_aTGC_WZ_%s_%s_%s__norm"%(region,ch,ch_num))
 
+    w.var(options.poi.split(':')[0]).setVal(float(options.poi.split(':')[1]))
+
     cwwwtmp=w.var('cwww').getVal();ccwtmp=w.var('ccw').getVal();cbtmp=w.var('cb').getVal()
 
     model   = RooAddPdf("model","model",RooArgList(bkg_pdfs["WW"],bkg_pdfs["WZ"],bkg_pdfs["TTbar"],bkg_pdfs["STop"],bkg_pdfs["WJets"]))
     model_norm  = float(bkg_norms["WJets"].getVal()+bkg_norms["STop"].getVal()+bkg_norms["TTbar"].getVal()+bkg_norms["WW"].getVal()+bkg_norms["WZ"].getVal())
 
     if spectrum == "mj":
-        model.plotOn(p,RooFit.Name("WWWZ_atgc"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["atgc"]),RooFit.DrawOption("F"),RooFit.FillStyle(3344))
+        model.plotOn(p,RooFit.Name("WWWZ_atgc"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["WW"]-8),RooFit.DrawOption("F"))
+        model.plotOn(p,RooFit.Name("WW_atgc"),RooFit.Components("STop,WJets,TTbar,WW"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["WW"]-6),RooFit.DrawOption("F"))
+
         w.var('cwww').setVal(0);w.var('ccw').setVal(0);w.var('cb').setVal(0);
         model_norm_tmp = float(bkg_norms["WJets"].getVal()+bkg_norms["STop"].getVal()+bkg_norms["TTbar"].getVal()+bkg_norms["WW"].getVal()+bkg_norms["WZ"].getVal())
         model.plotOn(p,RooFit.Name("WZSM"),RooFit.Normalization(model_norm_tmp,RooAbsReal.NumEvent),RooFit.FillColor(colors["WZ"]),RooFit.DrawOption("F"))
@@ -78,7 +83,8 @@ def plot(w,fitres,normset,spectrum,ch,region):
         model.plotOn(p,RooFit.Name("WJets_line"),RooFit.Components("WJets"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(2))
 
     elif spectrum == "mlvj":
-        model.plotOn(p,RooFit.Name("WWWZ_atgc"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["atgc"]),RooFit.FillStyle(3344),RooFit.DrawOption("F"))
+        model.plotOn(p,RooFit.Name("WWWZ_atgc"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["WW"]-6),RooFit.DrawOption("F"))
+        model.plotOn(p,RooFit.Name("WZ_atgc"),RooFit.Components("STop,WJets,TTbar,WZ"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["WW"]-8),RooFit.DrawOption("F"))
 
         w.var("cwww").setVal(0);w.var("ccw").setVal(0);w.var("cb").setVal(0);
         model_norm_tmp = float(bkg_norms["WJets"].getVal()+bkg_norms["STop"].getVal()+bkg_norms["TTbar"].getVal()+bkg_norms["WW"].getVal()+bkg_norms["WZ"].getVal())
@@ -192,7 +198,7 @@ def plot_all(w,ch="el",name='test.png'):
         pads.append(pad1)
         pads.append(pad_pull)
         p=plot(w,fitres,normset,'mlvj',ch,regs[i])
-        p.GetYaxis().SetRangeUser(2e-2,3e2)
+        p.GetYaxis().SetRangeUser(7e-2,3e2)
 
         canvas.cd()
         pad1.Draw()
