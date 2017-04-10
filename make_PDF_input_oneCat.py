@@ -127,7 +127,7 @@ class Prepare_workspace_4limit:
                     treeInATGC.GetEntry(i)
                     MWW                = treeInATGC.MWW
                     #apply cuts
-                    if treeInATGC.jet_pt>200. and treeInATGC.jet_tau2tau1<0.6 and treeInATGC.W_pt>200. and treeInATGC.deltaR_LeptonWJet>math.pi/2. and treeInATGC.Mjpruned>40 and treeInATGC.Mjpruned<150 and abs(treeInATGC.deltaPhi_WJetMet)>2. and abs(treeInATGC.deltaPhi_WJetWlep)>2. and treeInATGC.nbtag==0 and treeInATGC.pfMET>METCUT and MWW>self.binlo:
+                    if treeInATGC.jet_pt>200. and treeInATGC.jet_tau2tau1<0.6 and treeInATGC.W_pt>200. and treeInATGC.deltaR_LeptonWJet>math.pi/2. and treeInATGC.Mjpruned>65 and treeInATGC.Mjpruned<105 and abs(treeInATGC.deltaPhi_WJetMet)>2. and abs(treeInATGC.deltaPhi_WJetWlep)>2. and treeInATGC.nbtag==0 and treeInATGC.pfMET>METCUT and MWW>self.binlo:
                         weight_part = 1/20. * lumi_tmp * treeInATGC.totWeight
                         aTGC        = treeInATGC.aTGCWeights                #contains weights for different workingpoints
                         #all3
@@ -636,7 +636,6 @@ class Prepare_workspace_4limit:
                 
                 card += '''
 normvar_WJets_{ch}  flatParam
-TTbar_gaus_constr_{ch} param 1.0 0.2
 rrv_c_ErfExp_WJets0_{ch}  flatParam
 rrv_n_ExpN_WJets0_sb_{ch}  flatParam
 rrv_c_ExpN_WJets0_sb_{ch}  flatParam
@@ -713,10 +712,6 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
         ########################
         def Make_input(self):
 
-            #read data
-            fileInData        = TFile.Open('Input/treeEDBR_data_xww_%s.root'%(self.ch))
-            tree_data        = fileInData.Get('tree')  
-
             #prepare variables, parameters and temporary workspace
             if options.newtrees:
                 self.Read_ATGCtree(self.ch)
@@ -726,8 +721,8 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
             self.Make_signal_pdf(self.rrv_mass_lvj,'WZ')
 
             #read, rename and write bkg pdfs and bkg rates
-            fileInWs        = TFile.Open('Input/wwlvj_%s_HPV_workspace.root'%self.ch)
-            w_bkg        = fileInWs.Get('workspace4limit_') 
+            fileInWs    = TFile.Open('Input/wwlvj_%s_HPV_workspace.root'%self.ch)
+            w_bkg       = fileInWs.Get('workspace4limit_') 
 
             path        ='%s/src/CombinedEWKAnalysis/CommonTools/data/anomalousCoupling'%os.environ["CMSSW_BASE"]
 
@@ -744,7 +739,6 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
             #bkg-pdfs have the format '[bkg-name]_mlvj_[region]_[ch]' or '[bkg-name]_mj_[region]_[ch]'
 
-
             #create a workspace for each component in each region
             for region in self.regions:
                 self.WS2 = self.WS.Clone("w")        #temporary 
@@ -757,9 +751,6 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                     reg_Int     = w_bkg.pdf('mj_%s_%s'%(bkg,self.ch)).createIntegral(set_mj,set_mj, region)
                     if bkg=='WJets':        #norm floating for WJets, integral depends on (floating) shape parameter
                         norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'@0*@1',RooArgList(reg_Int,norm_var))
-                    elif bkg=='TTbar':      #TTbar is floating with gaussian constraint, applied with additional variable
-                        TTbar_g_var = RooRealVar('TTbar_gaus_constr_%s'%self.ch,'TTbar_gaus_constr_%s'%self.ch,1,0,2)
-                        norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0*@1'%reg_Int.getVal(),RooArgList(norm_var,TTbar_g_var))
                     else:#norm and integral fixed for rest
                         norm        = RooFormulaVar('%s_%s_%s_norm'%(bkg,region,self.ch),'%s_%s_%s_norm'%(bkg,region,self.ch),'%s*@0'%reg_Int.getVal(),RooArgList(norm_var))
                     if region == 'sig':
