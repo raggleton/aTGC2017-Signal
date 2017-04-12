@@ -8,11 +8,6 @@ import os
 
 gSystem.Load('%s/lib/slc6_amd64_gcc481/libHiggsAnalysisCombinedLimit.so'%os.environ['CMSSW_BASE'])
 from ROOT import RooErfExpPdf, RooErfPowExpPdf, RooErfPowPdf, RooErfPow2Pdf, RooExpNPdf, RooAlpha4ExpNPdf, RooExpTailPdf, RooAlpha4ExpTailPdf, Roo2ExpPdf
-gSystem.Load('PDFs/PdfDiagonalizer_cc.so')
-gSystem.Load('PDFs/Util_cxx.so')
-gSystem.Load('PDFs/hyperg_2F1_c.so')
-gSystem.Load('PDFs/HWWLVJRooPdfs_cxx.so')
-from ROOT import draw_error_band
 
 
 parser        = OptionParser()
@@ -127,7 +122,8 @@ class Prepare_workspace_4limit:
                     treeInATGC.GetEntry(i)
                     MWW                = treeInATGC.MWW
                     #apply cuts
-                    if treeInATGC.jet_pt>200. and treeInATGC.jet_tau2tau1<0.6 and treeInATGC.W_pt>200. and treeInATGC.deltaR_LeptonWJet>math.pi/2. and treeInATGC.Mjpruned>65 and treeInATGC.Mjpruned<105 and abs(treeInATGC.deltaPhi_WJetMet)>2. and abs(treeInATGC.deltaPhi_WJetWlep)>2. and treeInATGC.nbtag==0 and treeInATGC.pfMET>METCUT and MWW>self.binlo:
+                    #using whole mj-range (sideband and signal region)
+                    if treeInATGC.jet_pt>200. and treeInATGC.jet_tau2tau1<0.6 and treeInATGC.W_pt>200. and treeInATGC.deltaR_LeptonWJet>math.pi/2. and treeInATGC.Mjpruned>self.mj_lo and treeInATGC.Mjpruned<self.mj_hi and abs(treeInATGC.deltaPhi_WJetMet)>2. and abs(treeInATGC.deltaPhi_WJetWlep)>2. and treeInATGC.nbtag==0 and treeInATGC.pfMET>METCUT and MWW>self.binlo:
                         weight_part = 1/20. * lumi_tmp * treeInATGC.totWeight
                         aTGC        = treeInATGC.aTGCWeights                #contains weights for different workingpoints
                         #all3
@@ -339,7 +335,6 @@ class Prepare_workspace_4limit:
             a1_4fit.setConstant(kTRUE)
             #coefficient for SM term in final signal function
             N_SM            = RooRealVar('N_SM_%s'%channel,'N_SM_%s'%channel,SMdatahist.sumEntries())
-            N_SM.setConstant(kTRUE)
 
             self.Import_to_ws(self.wtmp,[cwww,ccw,cb,self.eps4cbWZ,SMdatahist,SMdatahist,N_SM])
             
@@ -380,6 +375,8 @@ class Prepare_workspace_4limit:
                 self.Import_to_ws(self.WS,[pos_datahist,neg_datahist,dif_datahist])
                 
                 #get scaling parabel from yields
+                #FIXME scaling to the sum of WW and WZ leads to over-estimating WW and under-estimating WZ
+                #FIXME scaling to WW and WZ separately leads to a really high scaling factor for WZ
                 hist4scale = TH1F('hist4scale_%s'%self.POI[i],'hist4scale_%s'%self.POI[i],3,-1.5*self.PAR_MAX[self.POI[i]],1.5*self.PAR_MAX[self.POI[i]])
                 hist4scale.SetBinContent(1,(negWW.sumEntries()+negWZ.sumEntries())/(SMWW.sumEntries()+SMWZ.sumEntries()))
                 hist4scale.SetBinContent(2,1)
@@ -398,7 +395,7 @@ class Prepare_workspace_4limit:
                 
                 #scaleshape is the relative change to SM
                 scaleshape  = RooFormulaVar('scaleshape_%s'%s_name,'scaleshape_%s'%s_name, '(@0*@2+@1*@2**2)', RooArgList(par1,par2,self.wtmp.var(self.POI[i])))
-                #FIXME only very few atgc events for cb in WZ sample, fit doesn't work yet -> different parametrization, or leave out completely
+                #FIXME only very few atgc events for cb in WZ sample, fit doesn't work yet -> different parametrization, starting values+ranges or leave out completely
                 if sample=='WZ' and self.POI[i]=='cb':
                     N_lin       = RooRealVar('N_lin_%s'%s_name,'N_lin_%s'%s_name, 0)
                     a2_4fit     = RooRealVar('a_quad_4fit_%s'%s_name,'a_quad_4fit_%s'%s_name,-0.1,-2,0.)
@@ -415,6 +412,7 @@ class Prepare_workspace_4limit:
                     #simple exponential sufficient for WW events
                     if   sample == 'WW':
                         cPdf_quad       = RooExponential('Pdf_quad_%s'%s_name,'Pdf_quad_%s'%s_name,rrv_x,a2)
+                    #additional error function to describe turn-on for WZ events
                     elif sample == 'WZ':
                         cPdf_quad       = RooErfExpPdf('Pdf_quad_%s'%s_name,'Pdf_quad_%s'%s_name,rrv_x,a2,self.wtmp.var('Erf_offset_%s'%s_name),self.wtmp.var('Erf_width_%s'%s_name))
                 a2_4fit.setConstant(kTRUE)
@@ -505,7 +503,7 @@ class Prepare_workspace_4limit:
             N6                = RooFormulaVar( 'N6_%s'%channel, 'N6_%s'%channel, '(@6*(@8/60)**2)/@11', paralistN )
             N7                = RooFormulaVar( 'N7_%s'%channel, 'N7_%s'%channel, '(@7*(@8/60))/@11', paralistN )
             N8                = RooFormulaVar( 'N8_%s'%channel, 'N8_%s'%channel, '(@9*(@2/12)*(@5/20))/@11', paralistN )
-            #N9 ->no aTGC-interference for c_WWW/c_B
+            #N9 ->no aTGC-interference for c_WWW/c_B #FIXME should be added for WZ
             N10                = RooFormulaVar( 'N10_%s'%channel,'N10_%s'%channel,'(@10*(@5/20)*(@8/60))/@11', paralistN )
 
             N_list        = RooArgList(N1,N2,N4,N5,N6,N7)
@@ -529,6 +527,7 @@ class Prepare_workspace_4limit:
                 self.wtmp.var(self.POI[i]).setVal(self.PAR_MAX[self.POI[i]])
 
                 #fit SM-interference first
+                ##no SM-interference for cwww; not enough aTGC events for cb in WZ sample
                 if not self.POI[i] == 'cwww' and not (sample=='WZ' and self.POI[i]=='cb'):
                     #set SM and quadratical terms to zero so only the linear term is fitted
                     N_SM_tmp = N_SM.getVal()
@@ -579,62 +578,60 @@ class Prepare_workspace_4limit:
                 print N_list.at(i).GetName() + ' : ' + str(N_list.at(i).getVal())
 
 
-        def Write_datacard(self,w):
+        def Write_datacard(self,w,region):
             ### make the card for this channel and plane ID
+            codename    = 'WWWZ_' + region + '_' + self.ch
+            bkgs_4card  = ['WJets','STop','TTbar']
+            Nbkg_int    = len(bkgs_4card)
+            uncert_map  = {}
+            ##define uncertainties
+            #                                              |------------el----------------------||------------mu----------------------|
+            #                                                WW   WZ     WJets   TTbar   STop      WW     WZ     WJets   TTbar   STop
+            uncert_map['lumi_13TeV']                    = [1.027,1.027  ,'-'    ,1.027  ,1.027  ,1.027  ,1.027  ,'-'    ,1.027  ,1.027]
+            uncert_map['CMS_eff_vtag_tau21_sf_13TeV']   = [1.120,1.120  ,'-'    ,1.120  ,1.120  ,1.120  ,1.120  ,'-'    ,1.120  ,1.120]
+            uncert_map['CMS_eff_b']                     = ['-'  ,1.001  ,'-'    ,1.008  ,'-'    ,'-'     ,'-'   ,'-'    ,1.008  ,'-'  ]
+            uncert_map['CMS_scale_e']                   = [1.006,'-'    ,'-'    ,'-'    ,1.005  ,'-'     ,'-'   ,'-'    ,'-'    ,'-'  ]
+            uncert_map['CMS_scale_m']                   = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.017  ,1.014  ,'-'    ,1.016  ,1.019]
+            uncert_map['pdf_qqbar']                     = [1.019,1.025  ,'-'    ,1.025  ,1.003  ,1.018  ,1.023  ,'-'    ,1.026  ,1.004]
+            uncert_map['QCD_scale_VV']                  = [1.060,1.060  ,'-'    ,'-'    ,'-'    ,1.060  ,1.060  ,'-'    ,'-'    ,'-'  ]
+            uncert_map['QCD_scale_TTbar']               = ['-'  ,'-'    ,'-'    ,1.190  ,1.020  ,'-'    ,'-'    ,'-'    ,1.190  ,1.019]
+            uncert_map['CMS_scale_met']                 = [1.006,1.005  ,'-'    ,1.005  ,1.012  ,1.002  ,1.003  ,'-'    ,1.001  ,1.005]
+            uncert_map['CMS_eff_e']                     = [1.001,1.001  ,'-'    ,1.001  ,1.001  ,'-'    ,'-'    ,'-'    ,'-'    ,'-'  ]
+            uncert_map['CMS_eff_m']                     = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.039  ,1.038  ,'-'    ,1.032  ,1.036]
+            ##FIXME jet energy scale? effects of up/down in different regions? ignored atm
+            uncert_map['CMS_scale_j']                   = [1.024,1.017  ,'-'    ,1.028  ,1.016  ,1.023  ,1.016  ,'-'    ,1.026  ,1.006  ]
+            bkgs                                        = ['WW','WZ','TTbar','STop']
+            NlnN    = len(uncert_map)
 
-            for region in self.regions:
-                codename    = 'WWWZ_' + region + '_' + self.ch
-                bkgs_4card  = ['WJets','STop','TTbar']
-                Nbkg_int    = len(bkgs_4card)
-                uncert_map  = {}
-                ##define uncertainties
-                #                                              |------------el----------------------||------------mu----------------------|
-                #                                                WW   WZ     WJets   TTbar   STop      WW     WZ     WJets   TTbar   STop
-                uncert_map['lumi_13TeV']                    = [1.027,1.027  ,'-'    ,1.027  ,1.027  ,1.027  ,1.027  ,'-'    ,1.027  ,1.027]
-                uncert_map['CMS_eff_vtag_tau21_sf_13TeV']   = [1.120,1.120  ,'-'    ,1.120  ,1.120  ,1.120  ,1.120  ,'-'    ,1.120  ,1.120]
-                uncert_map['CMS_eff_b']                     = ['-'  ,1.001  ,'-'    ,1.008  ,'-'    ,'-'     ,'-'   ,'-'    ,1.008  ,'-'  ]
-                uncert_map['CMS_scale_e']                   = [1.006,'-'    ,'-'    ,'-'    ,1.005  ,'-'     ,'-'   ,'-'    ,'-'    ,'-'  ]
-                uncert_map['CMS_scale_m']                   = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.017  ,1.014  ,'-'    ,1.016  ,1.019]
-                uncert_map['pdf_qqbar']                     = [1.019,1.025  ,'-'    ,1.025  ,1.003  ,1.018  ,1.023  ,'-'    ,1.026  ,1.004]
-                uncert_map['QCD_scale_VV']                  = [1.060,1.060  ,'-'    ,'-'    ,'-'    ,1.060  ,1.060  ,'-'    ,'-'    ,'-'  ]
-                uncert_map['QCD_scale_TTbar']               = ['-'  ,'-'    ,'-'    ,1.190  ,1.020  ,'-'    ,'-'    ,'-'    ,1.190  ,1.019]
-                uncert_map['CMS_scale_met']                 = [1.006,1.005  ,'-'    ,1.005  ,1.012  ,1.002  ,1.003  ,'-'    ,1.001  ,1.005]
-                uncert_map['CMS_eff_e']                     = [1.001,1.001  ,'-'    ,1.001  ,1.001  ,'-'    ,'-'    ,'-'    ,'-'    ,'-'  ]
-                uncert_map['CMS_eff_m']                     = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.039  ,1.038  ,'-'    ,1.032  ,1.036]
-                ##FIXME jet energy scale? effects of up/down in different regions? ignored atm
-                uncert_map['CMS_scale_j']                   = [1.024,1.017  ,'-'    ,1.028  ,1.016  ,1.023  ,1.016  ,'-'    ,1.026  ,1.006  ]
-                bkgs                                        = ['WW','WZ','TTbar','STop']
-                NlnN    = len(uncert_map)
-
-                card = """\nimax 1  number of channels\njmax {Nbkg_int}  number of backgrounds\nkmax *  number of nuisance parameters (sources of systematical uncertainties)\n-------------""".format(Nbkg_int=Nbkg_int+1)
-                for i in range(0,Nbkg_int):
-                    card += """\nshapes {bkg_name}\t\t\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,bkg_name=bkgs_4card[i])
-                card += """\nshapes data_obs\t\t\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename)    
-                card += """\nshapes aTGC_WW_{region}_{channel}\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,region=region,channel=self.ch)
-                card += """\nshapes aTGC_WZ_{region}_{channel}\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,region=region,channel=self.ch)
-                card += """\n------------\nbin\t\t\t{codename}\nobservation {obs}\n------------\nbin\t\t\t{codename}\t\t""".format(codename=codename,obs=w.data('dataset_2d_%s_%s'%(region,self.ch)).sumEntries())
-                for i in range(0,Nbkg_int+1):
-                    card += """\t\t{codename}""".format(codename=codename)
-                card += """\nprocess\t\taTGC_WW_{region}_{channel}    """.format(region=region,channel=self.ch)
-                card += """\t\taTGC_WZ_{region}_{channel}""".format(region=region,channel=self.ch)
-                for i in range(0,Nbkg_int):
-                    card += """\t\t{bkg_name}""".format(bkg_name=bkgs_4card[i])
-                card += """\nprocess\t\t-1\t\t\t\t\t\t\t0"""
-                for i in range(0,Nbkg_int):
-                    card += """ \t\t\t\t{i}""".format(i=i+1)
-                card += """\nrate\t\t1\t\t1"""
-                for i in range(0,Nbkg_int):
-                    card += """ \t\t\t1"""
-                card += """\n------------\n"""
-                for uncert in uncert_map:
-                    card += """{uncert}\t\t\tlnN\t\t""".format(uncert=uncert)
-                    for i in range(5):
-                        if self.ch=='mu':
-                            i += 5
-                        card += """{value}\t\t\t""".format(value=uncert_map[uncert][i])
-                    card += """\n"""
-                
-                card += '''
+            card = """\nimax 1  number of channels\njmax {Nbkg_int}  number of backgrounds\nkmax *  number of nuisance parameters (sources of systematical uncertainties)\n-------------""".format(Nbkg_int=Nbkg_int+1)
+            for i in range(0,Nbkg_int):
+                card += """\nshapes {bkg_name}\t\t\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,bkg_name=bkgs_4card[i])
+            card += """\nshapes data_obs\t\t\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename)    
+            card += """\nshapes aTGC_WW_{region}_{channel}\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,region=region,channel=self.ch)
+            card += """\nshapes aTGC_WZ_{region}_{channel}\t\t {codename} {codename}_ws.root\t proc_{codename}:$PROCESS""".format(codename=codename,region=region,channel=self.ch)
+            card += """\n------------\nbin\t\t\t{codename}\nobservation {obs}\n------------\nbin\t\t\t{codename}\t\t""".format(codename=codename,obs=w.data('dataset_2d_%s_%s'%(region,self.ch)).sumEntries())
+            for i in range(0,Nbkg_int+1):
+                card += """\t\t{codename}""".format(codename=codename)
+            card += """\nprocess\t\taTGC_WW_{region}_{channel}    """.format(region=region,channel=self.ch)
+            card += """\t\taTGC_WZ_{region}_{channel}""".format(region=region,channel=self.ch)
+            for i in range(0,Nbkg_int):
+                card += """\t\t{bkg_name}""".format(bkg_name=bkgs_4card[i])
+            card += """\nprocess\t\t-1\t\t\t\t\t\t\t0"""
+            for i in range(0,Nbkg_int):
+                card += """ \t\t\t\t{i}""".format(i=i+1)
+            card += """\nrate\t\t1\t\t1"""
+            for i in range(0,Nbkg_int):
+                card += """ \t\t\t1"""
+            card += """\n------------\n"""
+            for uncert in uncert_map:
+                card += """{uncert}\t\t\tlnN\t\t""".format(uncert=uncert)
+                for i in range(5):
+                    if self.ch=='mu':
+                        i += 5
+                    card += """{value}\t\t\t""".format(value=uncert_map[uncert][i])
+                card += """\n"""
+            
+            card += '''
 normvar_WJets_{ch}  flatParam
 rrv_c_ErfExp_WJets0_{ch}  flatParam
 rrv_n_ExpN_WJets0_sb_{ch}  flatParam
@@ -649,10 +646,10 @@ Deco_TTbar_sig_{ch}_HPV_mlvj_13TeV_eig0 param 0.0 2.0
 Deco_TTbar_sig_{ch}_HPV_mlvj_13TeV_eig1 param 0.0 2.0
 slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
-                print card
-                cardfile = open('aC_%s.txt'%(codename),'w')
-                cardfile.write(card)
-                cardfile.close()
+            print card
+            cardfile = open('aC_%s.txt'%(codename),'w')
+            cardfile.write(card)
+            cardfile.close()
 
 
         def Transform2lagrangian(N_list,Pdf_list,scale_list):
@@ -802,8 +799,10 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                 print 'Write to file ' + output.GetName()
 
 
-            ##create the datacards for all regions -> have to be combined with CombineCards.py
-            self.Write_datacard(w_bkg)
+            ##create the datacards for all regions
+            self.Write_datacard(w_bkg,"sb_lo")
+            self.Write_datacard(w_bkg,"sig")
+            self.Write_datacard(w_bkg,"sb_hi")
 
             #make some plots
             if options.Make_plots:
