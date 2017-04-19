@@ -14,13 +14,11 @@ parser        = OptionParser()
 parser.add_option('-n', '--newtrees', action='store_true', dest='newtrees', default=False, help='recreate aTGC histograms')
 parser.add_option('-p', '--plots', action='store_true', dest='Make_plots', default=False, help='make plots')
 parser.add_option('--savep', action='store_true', dest='savep', default=False, help='save plots')
-parser.add_option('--p2', action='store_true', dest='Make_plots2', default=False, help='make parabel plot')
 parser.add_option('-b', action='store_true', dest='batch', default=False, help='batch mode')
 parser.add_option('-c', '--ch', dest='chan', default='elmu', help='channel, el, mu or elmu')
 parser.add_option('--noatgcint', action='store_true', dest='noatgcint', default=False, help='set atgc-interference coefficients to zero')
 parser.add_option('--printatgc', action='store_true', default=False, help='print atgc-interference contribution')
 parser.add_option('--atgc', action='store_true', dest='atgc', default=False, help='use anomalous coupling parametrization instead of EFT')
-parser.add_option("--config",dest="config",default='config_simfit',help="The name of the input configuration file.")
 
 
 (options,args) = parser.parse_args()
@@ -33,8 +31,6 @@ if options.batch:
 
 if not os.path.isdir('Output'):
         os.system('mkdir Output')
-if not os.path.isdir('docuplots'):
-        os.system('mkdir docuplots')
 
 
 class Prepare_workspace_4limit:
@@ -257,8 +253,10 @@ class Prepare_workspace_4limit:
 
                 can[i].Update()
                 if options.savep:
-                    can[i].SaveAs('tmpplots/%s_neg_%s.pdf'%(self.POI[i],channel))
-                    can[i].SaveAs('tmpplots/%s_neg_%s.png'%(self.POI[i],channel))
+                    if not os.path.isdir('Plots'):
+                        os.system('mkdir Plots')
+                    can[i].SaveAs('Plots/%s_neg_%s.pdf'%(self.POI[i],channel))
+                    can[i].SaveAs('Plots/%s_neg_%s.png'%(self.POI[i],channel))
                 
 
                 for j in range(3):
@@ -292,8 +290,8 @@ class Prepare_workspace_4limit:
 
                 can2[i].Update()
                 if options.savep:
-                    can2[i].SaveAs('tmpplots/%s_pos_%s.pdf'%(self.POI[i],channel))
-                    can2[i].SaveAs('tmpplots/%s_pos_%s.png'%(self.POI[i],channel))
+                    can2[i].SaveAs('Plots/%s_pos_%s.pdf'%(self.POI[i],channel))
+                    can2[i].SaveAs('Plots/%s_pos_%s.png'%(self.POI[i],channel))
                     
             if not options.batch:
                 raw_input('plots plotted')
@@ -598,8 +596,8 @@ class Prepare_workspace_4limit:
             uncert_map['CMS_scale_met']                 = [1.006,1.005  ,'-'    ,1.005  ,1.012  ,1.002  ,1.003  ,'-'    ,1.001  ,1.005]
             uncert_map['CMS_eff_e']                     = [1.001,1.001  ,'-'    ,1.001  ,1.001  ,'-'    ,'-'    ,'-'    ,'-'    ,'-'  ]
             uncert_map['CMS_eff_m']                     = ['-'  ,'-'    ,'-'    ,'-'    ,'-'    ,1.039  ,1.038  ,'-'    ,1.032  ,1.036]
-            ##FIXME jet energy scale? effects of up/down in different regions? ignored atm
-            uncert_map['CMS_scale_j']                   = [1.024,1.017  ,'-'    ,1.028  ,1.016  ,1.023  ,1.016  ,'-'    ,1.026  ,1.006  ]
+            ##FIXME jet energy scale? effects of up/down in different regions ignored atm
+            uncert_map['CMS_scale_j']                   = [1.024,1.017  ,'-'    ,1.028  ,1.016  ,1.023  ,1.016  ,'-'    ,1.026  ,1.006]
             bkgs                                        = ['WW','WZ','TTbar','STop']
             NlnN    = len(uncert_map)
 
@@ -845,7 +843,6 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 ###run code###
 
 if __name__ == '__main__':
-    print "starting..."
     if options.chan=='elmu':
         makeWS_el        = Prepare_workspace_4limit('el',900,3500)
         makeWS_el.Make_input()
