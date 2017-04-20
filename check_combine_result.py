@@ -20,6 +20,7 @@ mj_bins = {"sb_lo":5,"sig":8,"sb_hi":9}
 parser        = OptionParser()
 parser.add_option('-c', '--ch', dest='ch', default='el', help='channel, el or mu')
 parser.add_option('-P','--POI', dest='poi', default='cwww:0')
+parser.add_option('-n', dest='name', default='')
 (options,args) = parser.parse_args()
 gStyle.SetOptStat(0)
 gStyle.SetOptTitle(0)
@@ -101,9 +102,6 @@ def plot(w,fitres,normset,spectrum,ch,region):
 
         model.plotOn(p,RooFit.Name("STop"),RooFit.Components("STop"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.FillColor(colors["STop"]),RooFit.DrawOption("F"))
         model.plotOn(p,RooFit.Name("STop_line"),RooFit.Components("STop"),RooFit.Normalization(model_norm,RooAbsReal.NumEvent),RooFit.LineColor(kBlack),RooFit.LineWidth(1))
-
-    data2 = RooDataHist('data2','data2',
-    draw_error_band_extendPdf(data,model,fitres,p,kBlack,"F")
 
     data_histo   = data.binnedClone("data","data").createHistogram("data",rrv_x,RooFit.Cut("CMS_channel==CMS_channel::%s"%ch_num))
     data_histo.Print()
@@ -232,36 +230,28 @@ def plot_all(w,ch="el",name='test.png'):
 
 
 
-
-
 fileIn      = TFile.Open("workspace_simfit.root")
 w           = fileIn.Get("w")
 fileIn.Close()
-fileIn      = TFile.Open("mlfit4plot.root")
+fileIn      = TFile.Open("mlfit%s.root"%options.name)
 fitres      = fileIn.Get("fit_s")
 normset     = fileIn.Get("norm_fit_s")
 fileIn.Close()
 
 fitparas    = fitres.floatParsFinal()
 
-#plot_all(w,options.ch,'prefit_%s.png'%options.ch)
+plot_all(w,options.ch,'prefit_%s.png'%options.ch)
 
-string = '{:>40} : {:>18} / {:>18} / {:>15} \n'.format('>>name<<','>>pre-fit<<','>>post-fit<<','>>scalefactor<<')
+string = '{:>40} : {:>30} / {:>30}\n'.format('>>name<<','>>pre-fit<<','>>post-fit<<')
 for i in range(fitparas.getSize()):
-    prefit  = w.var(fitparas.at(i).GetName()).getVal()
-    postfit = round(fitparas.at(i).getVal(),4)
-    if prefit!=0:
-        ratio = postfit/prefit
-    else:
-        ratio = 1+postfit
-    string += '{:>40} : {:>18} / {:>18} / {:>15}\n'.format(fitparas.at(i).GetName(),prefit,postfit,round(ratio,2))
+    prefit  = str(round(w.var(fitparas.at(i).GetName()).getVal(),6)) + ' +- ' + str(round(w.var(fitparas.at(i).GetName()).getError(),6))
+    postfit = str(round(fitparas.at(i).getVal(),6)) + ' +- ' + str(round(fitparas.at(i).getError(),6))
+    string += '{:>40} : {:>30} / {:>30}\n'.format(fitparas.at(i).GetName(),prefit,postfit)
 for i in range(fitparas.getSize()):
     w.var(fitparas.at(i).GetName()).setVal(fitparas.at(i).getVal())
 
 
-
 plot_all(w,options.ch,'postfit_%s.png'%options.ch)
-#plot_mlvj(w,options.ch)
 
 
 print string
