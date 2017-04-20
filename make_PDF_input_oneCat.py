@@ -72,10 +72,6 @@ class Prepare_workspace_4limit:
             self.bkgs        = ['WJets','TTbar','WW','WZ','STop']
             self.regions     = ['sig','sb_lo','sb_hi']
 
-            #read config##FIXME adjust naming
-            self.cfg = SafeConfigParser()
-            self.cfg.read(options.config)
-
 
         #read trees containing aTGC WW and WZ events and fill them into histograms
         def Read_ATGCtree(self,ch='el'):
@@ -722,7 +718,7 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
             path        ='%s/src/CombinedEWKAnalysis/CommonTools/data/anomalousCoupling'%os.environ["CMSSW_BASE"]
 
             for bkg in ['WJets','TTbar','STop','WW','WZ']:
-                print  "rrv_number_%s_%s_mj"%(bkg,self.ch)
+                w_bkg.var('norm_%s_%s'%(bkg,self.ch)).Print()
                 getattr(self.WS,'import')(w_bkg.var('norm_%s_%s'%(bkg,self.ch)))
 
             #import m_pruned and define ranges
