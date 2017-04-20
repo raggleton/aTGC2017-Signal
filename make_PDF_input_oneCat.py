@@ -40,11 +40,8 @@ class Prepare_workspace_4limit:
             self.POI                    = ['cwww','ccw','cb']
             self.PAR_TITLES             = {'cwww' : '#frac{c_{WWW}}{#Lambda^{2}}', 'ccw' : '#frac{c_{W}}{#Lambda^{2}}', 'cb' : '#frac{c_{B}}{#Lambda^{2}}'}#latex titles 
             self.PAR_MAX                = {'cwww' : 12, 'ccw' : 20, 'cb' : 60}#atgc points
-            self.signal_category        = 'WV'#only one signal region
             self.ch                     = ch
-            
-            self.mj_lo                  = 65.                    #lower bound of the signal region
-            self.mj_hi                  = 105.                   #upper bound
+
             self.binlo                  = mlvj_lo                #lower bound on invariant mass
             self.binhi                  = mlvj_hi                #upper bound
 
