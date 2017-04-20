@@ -115,7 +115,7 @@ class Prepare_workspace_4limit:
                     MWW                = treeInATGC.MWW
                     #apply cuts
                     #using whole mj-range (sideband and signal region)
-                    if treeInATGC.jet_pt>200. and treeInATGC.jet_tau2tau1<0.6 and treeInATGC.W_pt>200. and treeInATGC.deltaR_LeptonWJet>math.pi/2. and treeInATGC.Mjpruned>self.mj_lo and treeInATGC.Mjpruned<self.mj_hi and abs(treeInATGC.deltaPhi_WJetMet)>2. and abs(treeInATGC.deltaPhi_WJetWlep)>2. and treeInATGC.nbtag==0 and treeInATGC.pfMET>METCUT and MWW>self.binlo:
+                    if treeInATGC.jet_pt>200. and treeInATGC.jet_tau2tau1<0.6 and treeInATGC.W_pt>200. and treeInATGC.deltaR_LeptonWJet>math.pi/2. and treeInATGC.Mjpruned>40 and treeInATGC.Mjpruned<150 and abs(treeInATGC.deltaPhi_WJetMet)>2. and abs(treeInATGC.deltaPhi_WJetWlep)>2. and treeInATGC.nbtag==0 and treeInATGC.pfMET>METCUT and MWW>self.binlo:
                         weight_part = 1/20. * lumi_tmp * treeInATGC.totWeight
                         aTGC        = treeInATGC.aTGCWeights                #contains weights for different workingpoints
                         #all3
@@ -219,7 +219,6 @@ class Prepare_workspace_4limit:
                 plots[i].Draw()
                 ndof        = (self.binhi-self.binlo)/100 - 4
                 plots[i].Print()
-                #print calculate_chi2(self.wtmp.data('neg_datahist4fit_%s'%self.POI[i]),rrv_x,pullhist,plots[i],ndof,1)
                 
                 parlatex        = ['#frac{c_{WWW}}{#Lambda^{2}}','#frac{c_{W}}{#Lambda^{2}}','#frac{c_{B}}{#Lambda^{2}}']
                 leg        = TLegend(0.11,0.2,0.4,0.6)
@@ -757,7 +756,6 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
 
                 #signal function for WW and WZ in signal region and lower/upper sideband
                 ##FIXME? signal shape is not explicitly evaluated in the sideband region since its contribution is assumed to be negligible there
-                ##FIXME WZ scaling way too big
                 data_obs            = RooDataSet('data_obs','data_obs',w_bkg.data('dataset_2d_%s_%s'%(region,self.ch)),RooArgSet(self.WS2.var('rrv_mass_lvj'),self.WS2.var('mj_%s'%region)))
                 getattr(self.WS2,'import')(data_obs)
 
@@ -765,9 +763,7 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                     pdf_atgc_mlvj_VV    = self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,VV))
                     pdf_atgc_mj_VV      = w_bkg.pdf('%s_mj_%s_%s'%(VV,region,self.ch))
                     pdf_atgc_VV_2d      = RooProdPdf('aTGC_%s_%s_%s'%(VV,region,self.ch),'aTGC_%s_%s_%s'%(VV,region,self.ch),RooArgList(pdf_atgc_mlvj_VV,pdf_atgc_mj_VV))
-                    ###for now, sideband is scaled as signal region
                     #final normalization
-                    ##FIXME aTGC in sideband region scaled like signal region
                     norm_VV_reg         =self.WS2.function("%s_norm"%VV).Clone("%s_norm_%s_%s"%(VV,region,self.ch))
                     signal_norm_VV      = RooFormulaVar(pdf_atgc_VV_2d.GetName()+'_norm',pdf_atgc_VV_2d.GetName()+'_norm','@0*@1',RooArgList(self.WS2.function('normfactor_3d_%s_%s'%(self.ch,VV)),norm_VV_reg))
                     self.Import_to_ws(self.WS2,[pdf_atgc_VV_2d,signal_norm_VV],1)
@@ -784,11 +780,9 @@ slope_nuis    param  1.0 0.05'''.format(ch=self.ch)
                     self.WS2.var("Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig2"%self.ch).setConstant(kTRUE)
                     self.WS2.var("Deco_WJets0_sim_%s_HPV_mlvj_13TeV_eig3"%self.ch).setConstant(kTRUE)
 
-                #output        = TFile('%s/%s_%s_%s.root'%(path,sample,region,self.ch),'recreate')
                 output        = TFile('WWWZ_%s_%s_ws.root'%(region,self.ch),'recreate')
                 self.WS2.SetName('proc_WWWZ_%s_%s'%(region,self.ch))
                 self.WS2.Write();
-                #self.WS2.pdf('aTGC_model_%s_%s'%(self.ch,sample)).Write()
                 output.Close()
                 print 'Write to file ' + output.GetName()
 
