@@ -571,7 +571,7 @@ class Prepare_workspace_4limit:
         def Write_datacard(self,w,region):
             ### make the card for this channel and plane ID
             codename    = 'WWWZ_' + region + '_' + self.ch
-            bkgs_4card  = ['WJets','STop','TTbar']
+            bkgs_4card  = ['WJets','TTbar','STop']
             Nbkg_int    = len(bkgs_4card)
             uncert_map  = {}
             ##define uncertainties
